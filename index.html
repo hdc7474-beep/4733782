@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>법무부 정심 업무도우미</title>
+<meta name="description" content="자체 등록 자료를 기반으로 답변하는 소년보호 법령 AI 업무도우미" />
+<meta name="theme-color" content="#bfe3fb" id="themeColorMeta" />
+<script>
+  (function(){
+    try{
+      var raw = localStorage.getItem("jeongsim_theme");
+      var t = raw ? JSON.parse(raw) : "light";
+      document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+    }catch(e){ document.documentElement.setAttribute("data-theme","light"); }
+  })();
+</script>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html[data-theme="light"]{
+    color-scheme: light;
+    --bg: #eaf6ff;
+    --bg-soft: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #eef8ff;
+    --line: #cfe8f8;
+    --line-soft: #dff1fb;
+    --gold: #b8860b;
+    --gold-bright: #c99a1c;
+    --gold-dim: #9c7a17;
+    --navy: #1c2b5e;
+    --navy-hi: #26398a;
+    --text: #142433;
+    --text-dim: #4d6478;
+    --text-faint: #85a0b3;
+    --danger: #c0392b;
+    --danger-hi: #e04b3a;
+    --page-bg: linear-gradient(180deg,#bfe3fb 0%, #dff2fc 42%, #f3fbff 100%);
+    --header-bg: linear-gradient(180deg,#eef8ff,#ddf0fb);
+    --overlay-bg: rgba(25,55,85,.35);
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg: #15160e;
+    --bg-soft: #1b1c13;
+    --panel: #21221a;
+    --panel-2: #262719;
+    --line: #423d24;
+    --line-soft: #33301f;
+    --gold: #d9b64a;
+    --gold-bright: #f0cf6a;
+    --gold-dim: #8d7a3f;
+    --navy: #1c2b5e;
+    --navy-hi: #26398a;
+    --text: #f1ede1;
+    --text-dim: #b6b19e;
+    --text-faint: #7d7963;
+    --danger: #c15c52;
+    --danger-hi: #d97567;
+    --page-bg: radial-gradient(ellipse 900px 500px at 50% -8%, #262714 0%, transparent 60%), #15160e;
+    --header-bg: linear-gradient(180deg,#1c1d13,#171810);
+    --overlay-bg: rgba(10,10,6,.6);
+  }
+  :root{
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --radius-sm: 9px;
+    --serif: "Noto Serif KR", serif;
+    --sans: "Noto Sans KR", sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--page-bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+    transition:background .25s ease, color .25s ease;
+  }
+  button, input, textarea{ font-family:inherit; }
+  ::selection{ background:var(--gold-dim); color:#151509; }
+
+  #app{ min-height:100dvh; display:flex; flex-direction:column; }
+
+  /* ---------- shared bits ---------- */
+  .hidden{ display:none !important; }
+  .eyebrow{
+    letter-spacing:.14em; font-size:12px; color:var(--gold-dim); font-weight:700; text-transform:uppercase;
+  }
+  .btn{
+    appearance:none; border:none; cursor:pointer; border-radius:var(--radius-sm);
+    font-weight:700; font-size:15px; padding:14px 18px; transition:transform .12s ease, filter .12s ease, background .12s ease;
+  }
+  .btn:active{ transform:scale(.98); }
+  .btn-primary{ background:linear-gradient(180deg,var(--navy-hi),var(--navy)); color:#eef1ff; box-shadow:0 6px 18px -6px rgba(28,43,94,.7); }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--text-dim); }
+  .btn-ghost:hover{ border-color:var(--gold-dim); color:var(--text); }
+  .btn-danger{ background:transparent; border:1px solid var(--danger); color:var(--danger-hi); padding:8px 12px; font-size:13px; }
+  .btn-danger:hover{ background:color-mix(in srgb, var(--danger) 14%, transparent); }
+  .btn-sm{ padding:9px 13px; font-size:13px; border-radius:8px; }
+
+  .field-label{ font-size:13px; color:var(--text-dim); margin-bottom:8px; display:block; font-weight:500; }
+  .input, textarea.input{
+    width:100%; background:var(--bg-soft); border:1.5px solid var(--line); color:var(--text);
+    border-radius:var(--radius-sm); padding:15px 16px; font-size:15px; outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .input::placeholder{ color:var(--text-faint); }
+  .input:focus{ border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent); }
+  textarea.input{ resize:vertical; min-height:90px; line-height:1.5; }
+
+  .pw-wrap{ position:relative; }
+  .pw-wrap .input{ padding-right:48px; }
+  .pw-toggle{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--text-faint); cursor:pointer; padding:8px; font-size:18px; line-height:1;
+  }
+  .pw-toggle:hover{ color:var(--gold); }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--gold); font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px;
+  }
+
+  .toast{
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--panel-2); border:1px solid var(--gold-dim); color:var(--text); padding:12px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; z-index:999; transition:all .25s ease; pointer-events:none; box-shadow:0 10px 30px -8px rgba(0,0,0,.35);
+    max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .theme-toggle-fixed{
+    position:fixed; top:calc(16px + env(safe-area-inset-top)); right:16px; z-index:50;
+    background:var(--panel); box-shadow:0 6px 18px -8px rgba(0,0,0,.25);
+  }
+
+  .info-row{
+    display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;
+    margin:2px 0 26px;
+  }
+  .info-chip{
+    display:flex; align-items:center; gap:7px; background:var(--panel-2); border:1px solid var(--line);
+    padding:9px 15px; border-radius:999px; font-size:12.5px; color:var(--text-dim); font-weight:600;
+  }
+  .info-chip .icon{ font-size:15px; line-height:1; }
+  .info-chip .val{ color:var(--text); font-weight:700; }
+
+  /* ---------- LOCK SCREEN ---------- */
+  #lockScreen{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:40px 22px; text-align:center; gap:0;
+  }
+  .emblem{
+    width:150px; height:auto; border-radius:26px; overflow:hidden; box-shadow:0 18px 40px -14px rgba(0,0,0,.35);
+    border:1px solid var(--line); background:var(--panel);
+  }
+  .emblem img{ width:100%; height:auto; display:block; }
+  .brand-title{
+    font-family:var(--serif); font-weight:900; font-size:26px; margin:22px 0 6px; letter-spacing:-.01em;
+  }
+  .brand-sub{ color:var(--text-dim); font-size:14px; margin-bottom:34px; }
+  .lock-card{
+    width:100%; max-width:400px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:30px 26px; text-align:left;
+  }
+  .lock-card h2{ font-family:var(--serif); font-size:19px; margin:0 0 6px; text-align:center; }
+  .lock-card p.desc{ color:var(--text-dim); font-size:13.5px; text-align:center; margin:0 0 22px; }
+  .lock-card .btn-primary{ width:100%; margin-top:16px; }
+  .setup-note{
+    margin-top:14px; font-size:12px; color:var(--text-faint); line-height:1.6; text-align:center;
+  }
+  .field-gap{ margin-top:16px; }
+
+  /* ---------- CHAT SCREEN ---------- */
+  #chatScreen{ flex:1; display:flex; flex-direction:column; height:100dvh; }
+  .chat-header{
+    display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--line-soft);
+    background:var(--header-bg);
+  }
+  .chat-header .h-emblem{ width:34px; height:34px; border-radius:10px; overflow:hidden; flex:none; }
+  .chat-header .h-emblem img{ width:100%; height:100%; display:block; }
+  .chat-header .h-title{ font-weight:700; font-size:15px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-header .h-title small{ display:block; font-weight:400; color:var(--text-faint); font-size:11px; margin-top:1px; }
+  .icon-btn{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background:transparent; border:1px solid var(--line); color:var(--text-dim); cursor:pointer; font-size:16px; flex:none;
+  }
+  .icon-btn:hover{ border-color:var(--gold-dim); color:var(--gold); }
+
+  #chatLog{ flex:1; overflow-y:auto; padding:20px 14px 8px; display:flex; flex-direction:column; gap:14px; }
+  .msg-row{ display:flex; gap:9px; max-width:100%; }
+  .msg-row.user{ justify-content:flex-end; }
+  .msg-avatar{ width:30px; height:30px; border-radius:9px; flex:none; overflow:hidden; margin-top:2px; }
+  .msg-avatar img{ width:100%; height:100%; display:block; }
+  .bubble{
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:16px 16px 16px 4px;
+    padding:13px 15px; font-size:14.5px; line-height:1.65; max-width:82%; white-space:pre-wrap; word-break:break-word;
+  }
+  .bubble .cite{
+    display:block; margin-top:10px; padding-top:9px; border-top:1px dashed var(--line-soft);
+    font-size:12px; color:var(--gold-dim); font-weight:700;
+  }
+  .bubble .tag{
+    display:inline-block; margin-bottom:8px; font-size:11px; font-weight:700; color:var(--gold);
+    background:color-mix(in srgb, var(--gold) 12%, transparent); border:1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+    padding:2px 8px; border-radius:999px;
+  }
+  .msg-row.user .bubble{ background:var(--navy); border-color:#2a3d84; color:#eef1ff; border-radius:16px 16px 4px 16px; }
+  .msg-row.bot .bubble{ }
+
+  .empty-state{
+    text-align:center; color:var(--text-faint); font-size:13px; padding:26px 20px; border:1px dashed var(--line);
+    border-radius:var(--radius-md); margin:6px 4px;
+  }
+
+  .faq-wrap{ padding:4px 14px 12px; }
+  .faq-label{ font-size:12px; color:var(--gold-dim); font-weight:700; margin-bottom:9px; }
+  .faq-scroll{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+  .faq-chip{
+    flex:none; white-space:nowrap; background:var(--panel-2); border:1px solid var(--line); color:var(--text-dim);
+    padding:10px 14px; border-radius:999px; font-size:13px; cursor:pointer;
+  }
+  .faq-chip:hover{ border-color:var(--gold-dim); color:var(--gold); }
+
+  .chat-input-bar{
+    display:flex; gap:10px; padding:12px 14px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line-soft); background:var(--header-bg);
+  }
+  .chat-input-bar textarea{
+    flex:1; resize:none; max-height:120px; border-radius:16px; padding:13px 16px;
+  }
+  .send-btn{
+    width:48px; height:48px; border-radius:14px; flex:none; background:linear-gradient(180deg,var(--navy-hi),var(--navy));
+    border:none; color:#fff; font-size:18px; cursor:pointer;
+  }
+  .send-btn:disabled{ opacity:.4; cursor:default; }
+
+  .typing{ display:inline-flex; gap:4px; align-items:center; padding:4px 0; }
+  .typing span{ width:6px; height:6px; border-radius:50%; background:var(--gold-dim); animation:blink 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2){ animation-delay:.2s; }
+  .typing span:nth-child(3){ animation-delay:.4s; }
+  @keyframes blink{ 0%,80%,100%{ opacity:.25; } 40%{ opacity:1; } }
+
+  /* ---------- ADMIN DRAWER ---------- */
+  #adminOverlay{
+    position:fixed; inset:0; background:var(--overlay-bg); backdrop-filter:blur(2px); z-index:60;
+    display:flex; justify-content:flex-end;
+  }
+  #adminDrawer{
+    width:100%; max-width:460px; height:100%; background:var(--bg-soft); border-left:1px solid var(--line);
+    display:flex; flex-direction:column; animation:slideIn .22s ease;
+  }
+  @keyframes slideIn{ from{ transform:translateX(24px); opacity:0;} to{ transform:translateX(0); opacity:1; } }
+  .drawer-head{
+    display:flex; align-items:center; gap:12px; padding:18px 16px; border-bottom:1px solid var(--line-soft);
+  }
+  .drawer-head h2{ font-family:var(--serif); font-size:18px; margin:0; flex:1; }
+  .drawer-back{ background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer; padding:6px; }
+  .drawer-close{ background:none; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; padding:6px; }
+
+  .tabbar{ display:flex; border-bottom:1px solid var(--line-soft); padding:0 10px; gap:4px; }
+  .tab-btn{
+    background:none; border:none; color:var(--text-faint); padding:13px 12px; font-size:13.5px; font-weight:700;
+    cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; gap:6px;
+  }
+  .tab-btn.active{ color:var(--gold); border-bottom-color:var(--gold); }
+
+  .tab-panel{ flex:1; overflow-y:auto; padding:22px 18px 40px; }
+  .tab-panel h3{ font-size:15px; margin:0 0 4px; }
+  .tab-panel .hint{ font-size:12.5px; color:var(--text-dim); line-height:1.6; margin:0 0 20px; }
+
+  .count-badge{
+    display:inline-flex; align-items:center; background:var(--navy); color:#dfe4ff; font-size:12px; font-weight:800;
+    padding:2px 9px; border-radius:999px; margin-left:6px;
+  }
+
+  .doc-card{
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--radius-md);
+    padding:13px 14px; margin-bottom:10px; display:flex; align-items:center; gap:12px;
+  }
+  .doc-icon{
+    width:34px; height:34px; border-radius:9px; background:color-mix(in srgb, var(--gold) 12%, transparent); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-size:15px; flex:none;
+  }
+  .doc-meta{ flex:1; min-width:0; }
+  .doc-title{ font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .doc-sub{ font-size:11.5px; color:var(--text-faint); margin-top:2px; }
+  .doc-trash{ background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; padding:8px; flex:none; }
+  .doc-trash:hover{ color:var(--danger-hi); }
+
+  .upload-zone{
+    border:1.5px dashed var(--line); border-radius:var(--radius-md); padding:22px 16px; text-align:center; margin-bottom:16px;
+    cursor:pointer; transition:border-color .15s;
+  }
+  .upload-zone:hover{ border-color:var(--gold-dim); }
+  .upload-zone .up-icon{ font-size:22px; margin-bottom:8px; }
+  .upload-zone .up-text{ font-size:13.5px; font-weight:700; }
+  .upload-zone .up-sub{ font-size:12px; color:var(--text-faint); margin-top:4px; }
+
+  .divider-label{
+    display:flex; align-items:center; gap:10px; color:var(--text-faint); font-size:11.5px; font-weight:700;
+    margin:22px 0 14px; letter-spacing:.06em;
+  }
+  .divider-label::before, .divider-label::after{ content:""; flex:1; height:1px; background:var(--line-soft); }
+
+  .qa-log-card{
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;
+  }
+  .qa-log-q{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+  .qa-log-time{ font-size:11px; color:var(--text-faint); margin-bottom:10px; }
+  .qa-log-card textarea{ margin-bottom:10px; min-height:70px; }
+  .qa-log-actions{ display:flex; gap:8px; justify-content:flex-end; }
+
+  .qna-card{
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--radius-md); padding:13px 14px; margin-bottom:10px;
+  }
+  .qna-top{ margin-bottom:6px; }
+  .qna-q{ font-size:13.5px; font-weight:700; color:var(--gold); margin-bottom:5px; }
+  .qna-a{ font-size:13px; color:var(--text-dim); line-height:1.55; white-space:pre-wrap; }
+  .qna-src{ font-size:11.5px; color:var(--text-faint); margin-top:8px; padding-top:8px; border-top:1px dashed var(--line-soft); }
+  .qna-foot{ display:flex; justify-content:flex-end; margin-top:8px; }
+  .auto-badge{ color:#3a8fd9; background:color-mix(in srgb, #3a8fd9 12%, transparent); border-color:color-mix(in srgb, #3a8fd9 32%, transparent); }
+  .manual-badge{ color:var(--text-dim); }
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--radius-md);
+    padding:14px 16px; margin-bottom:20px;
+  }
+  .toggle-row .toggle-copy{ flex:1; }
+  .toggle-row .toggle-copy .t-title{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+  .toggle-row .toggle-copy .t-sub{ font-size:12px; color:var(--text-dim); line-height:1.55; }
+  .switch{ position:relative; display:inline-block; width:46px; height:26px; flex:none; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch .slider{
+    position:absolute; cursor:pointer; inset:0; background:var(--line); border-radius:999px; transition:.2s;
+  }
+  .switch .slider::before{
+    content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;
+    box-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .switch input:checked + .slider{ background:var(--navy); }
+  .switch input:checked + .slider::before{ transform:translateX(20px); }
+
+  .empty-mini{ text-align:center; color:var(--text-faint); font-size:12.5px; padding:26px 10px; }
+
+  @media (max-width:480px){
+    .lock-card{ padding:24px 20px; }
+    #adminDrawer{ max-width:100%; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= LOCK SCREEN ================= -->
+  <section id="lockScreen">
+    <button class="icon-btn theme-toggle-fixed theme-toggle-btn" id="themeToggleLock" title="다크모드 전환">🌙</button>
+
+    <div class="emblem"><img src="./login-hero.png" alt="정심 캐릭터" /></div>
+    <h1 class="brand-title">법무부 정심 업무도우미</h1>
+    <p class="brand-sub">소년보호 법령 AI 어시스턴트</p>
+
+    <div class="info-row" id="infoRow">
+      <div class="info-chip" id="clockChip"><span class="icon">🕐</span><span class="val" id="clockVal">--:--</span></div>
+      <div class="info-chip" id="weatherChip"><span class="icon" id="weatherIcon">🌤️</span><span class="val" id="weatherVal">날씨 확인 중…</span></div>
+    </div>
+
+    <!-- first-run setup -->
+    <div class="lock-card" id="setupCard">
+      <h2>최초 설정</h2>
+      <p class="desc">처음 시작하시는군요. 사용할 비밀번호 두 가지를 정해주세요.</p>
+
+      <label class="field-label">접속 비밀번호 (일반 사용자용)</label>
+      <div class="pw-wrap">
+        <input class="input" type="password" id="setupAccessPw" placeholder="4자리 이상 입력" />
+        <button class="pw-toggle" data-toggle="setupAccessPw" type="button">👁</button>
+      </div>
+
+      <div class="field-gap">
+        <label class="field-label">관리자 비밀번호 (자료 관리용)</label>
+        <div class="pw-wrap">
+          <input class="input" type="password" id="setupAdminPw" placeholder="접속 비밀번호와 다르게 설정 권장" />
+          <button class="pw-toggle" data-toggle="setupAdminPw" type="button">👁</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="setupSaveBtn">비밀번호 설정하고 시작하기</button>
+      <p class="setup-note">※ 비밀번호는 이 기기(브라우저)에만 저장되며 외부로 전송되지 않아요. 나중에 관리자 모드에서 언제든 변경할 수 있어요.</p>
+    </div>
+
+    <!-- returning user login -->
+    <div class="lock-card hidden" id="loginCard">
+      <h2>접속 비밀번호</h2>
+      <p class="desc">접속하려면 비밀번호를 입력하세요</p>
+      <div class="pw-wrap">
+        <input class="input" type="password" id="loginPw" placeholder="비밀번호 입력" />
+        <button class="pw-toggle" data-toggle="loginPw" type="button">👁</button>
+      </div>
+      <button class="btn btn-primary" id="loginBtn">접속</button>
+    </div>
+  </section>
+
+  <!-- ================= CHAT SCREEN ================= -->
+  <section id="chatScreen" class="hidden">
+    <div class="chat-header">
+      <div class="h-emblem"><img src="./icon-192.png" alt="" /></div>
+      <div class="h-title">법무부 정심 업무도우미<small>소년보호 법령 AI 어시스턴트</small></div>
+      <button class="icon-btn theme-toggle-btn" id="themeToggleChat" title="다크모드 전환">🌙</button>
+      <button class="icon-btn" id="lockAgainBtn" title="잠금">🔒</button>
+      <button class="icon-btn" id="openAdminBtn" title="관리자 모드">⚙️</button>
+    </div>
+
+    <div id="chatLog"></div>
+
+    <div class="faq-wrap" id="faqWrap">
+      <div class="faq-label">자주 찾는 질문</div>
+      <div class="faq-scroll" id="faqScroll"></div>
+    </div>
+
+    <div class="chat-input-bar">
+      <textarea class="input" id="chatInput" rows="1" placeholder="업무에 대해 질문하세요..."></textarea>
+      <button class="send-btn" id="sendBtn">➤</button>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ================= ADMIN OVERLAY ================= -->
+<div id="adminOverlay" class="hidden">
+  <div id="adminDrawer">
+    <div class="drawer-head">
+      <button class="drawer-back hidden" id="drawerBackBtn">←</button>
+      <h2 id="drawerTitle">관리자 모드</h2>
+      <button class="drawer-close" id="closeAdminBtn">×</button>
+    </div>
+
+    <!-- admin password gate -->
+    <div id="adminGate" class="tab-panel">
+      <h3>관리자 비밀번호</h3>
+      <p class="hint">자료 등록·삭제, 학습 로그, 비밀번호 변경은 관리자 인증이 필요해요.</p>
+      <div class="pw-wrap">
+        <input class="input" type="password" id="adminGatePw" placeholder="관리자 비밀번호 입력" />
+        <button class="pw-toggle" data-toggle="adminGatePw" type="button">👁</button>
+      </div>
+      <button class="btn btn-primary" id="adminGateBtn" style="width:100%; margin-top:16px;">확인</button>
+    </div>
+
+    <!-- authenticated admin area -->
+    <div id="adminAuthed" class="hidden" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+      <div class="tabbar">
+        <button class="tab-btn active" data-tab="access">🔒 접속</button>
+        <button class="tab-btn" data-tab="admin">🔑 관리자</button>
+        <button class="tab-btn" data-tab="data">📤 데이터</button>
+        <button class="tab-btn" data-tab="learn">🧠 학습</button>
+      </div>
+
+      <!-- 접속 비밀번호 변경 -->
+      <div class="tab-panel" data-panel="access">
+        <h3>접속 비밀번호 변경</h3>
+        <p class="hint">일반 사용자가 앱을 열 때 입력하는 비밀번호예요.</p>
+        <label class="field-label">새 접속 비밀번호</label>
+        <input class="input" type="password" id="newAccessPw" placeholder="새 비밀번호" />
+        <div class="field-gap">
+          <label class="field-label">새 접속 비밀번호 확인</label>
+          <input class="input" type="password" id="newAccessPw2" placeholder="다시 입력" />
+        </div>
+        <button class="btn btn-primary" id="saveAccessPwBtn" style="width:100%; margin-top:16px;">변경하기</button>
+      </div>
+
+      <!-- 관리자 비밀번호 변경 -->
+      <div class="tab-panel hidden" data-panel="admin">
+        <h3>관리자 비밀번호 변경</h3>
+        <p class="hint">관리자 모드(자료 등록/삭제, 학습 로그)에 들어올 때 쓰는 비밀번호예요.</p>
+        <label class="field-label">새 관리자 비밀번호</label>
+        <input class="input" type="password" id="newAdminPw" placeholder="새 비밀번호" />
+        <div class="field-gap">
+          <label class="field-label">새 관리자 비밀번호 확인</label>
+          <input class="input" type="password" id="newAdminPw2" placeholder="다시 입력" />
+        </div>
+        <button class="btn btn-primary" id="saveAdminPwBtn" style="width:100%; margin-top:16px;">변경하기</button>
+      </div>
+
+      <!-- 데이터 -->
+      <div class="tab-panel hidden" data-panel="data">
+        <h3>자료 관리 <span class="count-badge" id="docCountBadge">0개</span></h3>
+        <p class="hint">법령, 지침, 업무 매뉴얼 등을 등록하면 챗봇이 해당 내용을 참고하여 답변합니다. txt·md·pdf 파일을 올리거나, 텍스트를 직접 붙여넣을 수 있어요.</p>
+
+        <div class="upload-zone" id="uploadZone">
+          <div class="up-icon">📤</div>
+          <div class="up-text">파일 선택 또는 여기로 끌어다 놓기</div>
+          <div class="up-sub">.txt · .md · .pdf 지원</div>
+          <input type="file" id="fileInput" accept=".txt,.md,.pdf" multiple class="hidden" />
+        </div>
+
+        <div class="divider-label">또는 텍스트 직접 추가</div>
+        <label class="field-label">자료 제목</label>
+        <input class="input" id="pasteTitle" placeholder="예: 소년법 제32조 요약" />
+        <div class="field-gap">
+          <label class="field-label">내용</label>
+          <textarea class="input" id="pasteContent" placeholder="법령 조항이나 업무 매뉴얼 내용을 붙여넣으세요"></textarea>
+        </div>
+        <button class="btn btn-ghost" id="pasteAddBtn" style="width:100%; margin-top:12px;">텍스트로 추가</button>
+
+        <div class="divider-label">업로드된 데이터</div>
+        <div id="docList"></div>
+      </div>
+
+      <!-- 학습 -->
+      <div class="tab-panel hidden" data-panel="learn">
+        <h3>자동학습</h3>
+        <p class="hint">정심이는 등록된 자료에서 자신 있게 찾은 답변을 자동으로 학습해서, 같은 질문엔 다음부터 더 빠르고 일관되게 답해요. 자료를 새로 등록할 때도 핵심 내용을 미리 스스로 학습해둬요.</p>
+
+        <div class="toggle-row">
+          <div class="toggle-copy">
+            <div class="t-title">업로드 자료 기반 자동학습</div>
+            <div class="t-sub">끄면 관리자가 직접 입력한 답변만 학습 데이터로 저장돼요.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoLearnToggle" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="divider-label">답변하지 못한 질문</div>
+        <p class="hint">챗봇이 자신 있게 답하지 못한 질문이에요. 답을 입력해 저장하면 다음부터 같은 질문에 바로 정확히 답해요.</p>
+        <div id="unansweredList"></div>
+
+        <div class="divider-label">질문·답변 직접 추가</div>
+        <label class="field-label">예상 질문</label>
+        <input class="input" id="manualQ" placeholder="예: 소년원 퇴원은 언제 가능한가요?" />
+        <div class="field-gap">
+          <label class="field-label">답변</label>
+          <textarea class="input" id="manualA" placeholder="답변 내용을 입력하세요"></textarea>
+        </div>
+        <button class="btn btn-ghost" id="manualAddBtn" style="width:100%; margin-top:12px;">학습 데이터로 저장</button>
+
+        <div class="divider-label">저장된 학습 데이터 <span class="count-badge" id="qnaCountBadge">0개</span></div>
+        <div id="qnaList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- storage helpers ---------------- */
+  const NS = "jeongsim_";
+  const store = {
+    get(key, fallback){
+      try{ const v = localStorage.getItem(NS+key); return v===null ? fallback : JSON.parse(v); }
+      catch(e){ return fallback; }
+    },
+    set(key, val){ try{ localStorage.setItem(NS+key, JSON.stringify(val)); }catch(e){ toast("저장 공간이 부족해요. 오래된 자료를 정리해주세요."); } },
+  };
+
+  const $ = (sel, root) => (root||document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(()=> t.classList.remove("show"), 2400);
+  }
+
+  function fmtDate(ts){
+    const d = new Date(ts);
+    const p = n => String(n).padStart(2,"0");
+    return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  /* ---------------- theme (light = sky blue default, dark = original) ---------------- */
+  function applyTheme(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+    const meta = document.getElementById("themeColorMeta");
+    if (meta) meta.setAttribute("content", theme === "dark" ? "#15160e" : "#bfe3fb");
+    $$(".theme-toggle-btn").forEach(b => b.textContent = theme === "dark" ? "☀️" : "🌙");
+    store.set("theme", theme);
+  }
+  function initTheme(){
+    applyTheme(store.get("theme", "light"));
+  }
+  function toggleTheme(){
+    const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    applyTheme(cur === "dark" ? "light" : "dark");
+  }
+
+  /* ---------------- live clock ---------------- */
+  function updateClock(){
+    const el = document.getElementById("clockVal");
+    if (!el) return;
+    const now = new Date();
+    const days = ["일","월","화","수","목","금","토"];
+    const ampm = now.getHours() < 12 ? "오전" : "오후";
+    let h12 = now.getHours() % 12; if (h12 === 0) h12 = 12;
+    const m = String(now.getMinutes()).padStart(2,"0");
+    el.textContent = `${ampm} ${h12}:${m} · ${now.getMonth()+1}월 ${now.getDate()}일(${days[now.getDay()]})`;
+  }
+
+  /* ---------------- weather (Open-Meteo, free, no API key) ---------------- */
+  const WEATHER_MAP = {
+    0:["맑음","☀️"], 1:["대체로 맑음","🌤️"], 2:["구름 조금","⛅"], 3:["흐림","☁️"],
+    45:["안개","🌫️"], 48:["안개","🌫️"],
+    51:["이슬비","🌦️"], 53:["이슬비","🌦️"], 55:["이슬비","🌦️"],
+    61:["비","🌧️"], 63:["비","🌧️"], 65:["강한 비","🌧️"],
+    71:["눈","❄️"], 73:["눈","❄️"], 75:["폭설","❄️"],
+    80:["소나기","🌦️"], 81:["소나기","🌦️"], 82:["강한 소나기","🌦️"],
+    95:["뇌우","⛈️"], 96:["뇌우","⛈️"], 99:["뇌우","⛈️"]
+  };
+  function loadWeather(){
+    const valEl = document.getElementById("weatherVal");
+    const iconEl = document.getElementById("weatherIcon");
+    if (!valEl) return;
+    if (!("geolocation" in navigator)){
+      valEl.textContent = "날씨 정보를 사용할 수 없어요";
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`)
+          .then(r => r.json())
+          .then(data => {
+            const cur = data && data.current;
+            if (!cur) throw new Error("no-data");
+            const [desc, icon] = WEATHER_MAP[cur.weather_code] || ["-","🌡️"];
+            if (iconEl) iconEl.textContent = icon;
+            valEl.textContent = `${Math.round(cur.temperature_2m)}°C · ${desc}`;
+          })
+          .catch(()=>{ valEl.textContent = "날씨 정보를 불러오지 못했어요"; });
+      },
+      ()=>{ valEl.textContent = "위치 권한을 허용하면 날씨를 보여드려요"; },
+      { timeout: 8000 }
+    );
+  }
+
+  /* ---------------- password show/hide ---------------- */
+  $$(".pw-toggle").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const input = document.getElementById(btn.dataset.toggle);
+      input.type = input.type === "password" ? "text" : "password";
+    });
+  });
+
+  /* ================= AUTH / LOCK SCREEN ================= */
+  const lockScreen = $("#lockScreen");
+  const chatScreen = $("#chatScreen");
+  const setupCard = $("#setupCard");
+  const loginCard = $("#loginCard");
+
+  function hasAccounts(){ return !!store.get("accessPw", null) && !!store.get("adminPw", null); }
+
+  function showLock(){
+    chatScreen.classList.add("hidden");
+    lockScreen.classList.remove("hidden");
+    if (hasAccounts()){
+      setupCard.classList.add("hidden");
+      loginCard.classList.remove("hidden");
+      $("#loginPw").value = "";
+      setTimeout(()=> $("#loginPw").focus(), 50);
+    } else {
+      loginCard.classList.add("hidden");
+      setupCard.classList.remove("hidden");
+    }
+  }
+
+  $("#setupSaveBtn").addEventListener("click", ()=>{
+    const a = $("#setupAccessPw").value.trim();
+    const b = $("#setupAdminPw").value.trim();
+    if (a.length < 4){ toast("접속 비밀번호는 4자리 이상으로 설정해주세요."); return; }
+    if (b.length < 4){ toast("관리자 비밀번호는 4자리 이상으로 설정해주세요."); return; }
+    store.set("accessPw", a);
+    store.set("adminPw", b);
+    toast("설정이 완료됐어요!");
+    enterChat();
+  });
+
+  $("#loginBtn").addEventListener("click", tryLogin);
+  $("#loginPw").addEventListener("keydown", e=>{ if(e.key==="Enter") tryLogin(); });
+  function tryLogin(){
+    const v = $("#loginPw").value;
+    if (v === store.get("accessPw", null)){
+      enterChat();
+    } else {
+      toast("비밀번호가 올바르지 않아요.");
+    }
+  }
+
+  $("#lockAgainBtn").addEventListener("click", showLock);
+  $("#themeToggleLock").addEventListener("click", toggleTheme);
+  $("#themeToggleChat").addEventListener("click", toggleTheme);
+
+  function enterChat(){
+    lockScreen.classList.add("hidden");
+    chatScreen.classList.remove("hidden");
+    renderFaqChips();
+    if ($("#chatLog").children.length === 0) renderGreeting();
+  }
+
+  /* ================= DOCUMENT STORE ================= */
+  function getDocs(){ return store.get("docs", []); }
+  function setDocs(docs){ store.set("docs", docs); }
+  function getQna(){ return store.get("qna", []); }
+  function setQna(v){ store.set("qna", v); }
+  function getAutoLearn(){ return store.get("autoLearn", true); }
+  function setAutoLearn(v){ store.set("autoLearn", !!v); }
+  function getUnanswered(){ return store.get("unanswered", []); }
+  function setUnanswered(v){ store.set("unanswered", v); }
+
+  /* ================= ANSWER ENGINE ================= */
+  const STOPWORDS = new Set(["은","는","이","가","을","를","의","에","에서","으로","로","와","과","도","만","좀","요","입니까","인가요","무엇","뭐","뭔가요","알려주세요","알려줘","궁금해요","궁금합니다","합니다","있나요","해주세요","그리고","그럼","저는","제가","입니다","하나요","한가요","해요","인지","대해","대한","무엇인가요"]);
+
+  function tokenize(str){
+    return (str||"")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .map(w=>w.trim())
+      .filter(w => w.length > 1 && !STOPWORDS.has(w));
+  }
+
+  function chunkDoc(doc){
+    const raw = doc.content.split(/\n{2,}/).map(s=>s.trim()).filter(Boolean);
+    const chunks = [];
+    let buf = "";
+    raw.forEach(p=>{
+      if ((buf + p).length > 480 && buf){ chunks.push(buf); buf = p; }
+      else buf = buf ? buf + "\n" + p : p;
+    });
+    if (buf) chunks.push(buf);
+    if (chunks.length === 0 && doc.content.trim()) chunks.push(doc.content.trim());
+    return chunks.map(c => ({ docId: doc.id, docTitle: doc.title, text: c, tokens: tokenize(c) }));
+  }
+
+  function buildIndex(){
+    const docs = getDocs();
+    let chunks = [];
+    docs.forEach(d => { chunks = chunks.concat(chunkDoc(d)); });
+    return chunks;
+  }
+
+  function tokenRelated(a, b){
+    if (a === b) return true;
+    const minLen = Math.min(a.length, b.length);
+    if (minLen < 2) return false;
+    if (minLen >= 3 && (a.includes(b) || b.includes(a))) return true;
+    let lcp = 0;
+    while (lcp < minLen && a[lcp] === b[lcp]) lcp++;
+    const required = minLen <= 3 ? minLen - 1 : Math.ceil(minLen * 0.7);
+    return lcp >= required && lcp >= 2;
+  }
+
+  function scoreChunk(queryTokens, chunk, rawQuery){
+    if (chunk.tokens.length === 0) return 0;
+    let score = 0;
+    queryTokens.forEach(qt => {
+      if (chunk.tokens.some(dt => tokenRelated(qt, dt))) score += 1;
+    });
+    if (rawQuery.length > 3 && chunk.text.includes(rawQuery.trim())) score += 5;
+    return score;
+  }
+
+  function findQnaMatch(query){
+    const qTokens = tokenize(query);
+    if (qTokens.length === 0) return null;
+    const list = getQna();
+    let best = null, bestScore = 0;
+    list.forEach(item=>{
+      const iTokens = tokenize(item.question);
+      if (iTokens.length === 0) return;
+      let overlap = 0;
+      qTokens.forEach(t => { if (iTokens.some(it => tokenRelated(t, it))) overlap += 1; });
+      const ratio = overlap / iTokens.length;
+      if (ratio > bestScore){ bestScore = ratio; best = item; }
+    });
+    if (best && bestScore >= 0.55) return best;
+    return null;
+  }
+
+  function isAlreadyLearned(query){
+    return !!findQnaMatch(query);
+  }
+
+  function autoSaveLearnedAnswer(question, answerText, sourceDocIds, sourceDocTitles){
+    if (!getAutoLearn()) return;
+    const q = question.trim();
+    if (q.length < 4) return;
+    if (isAlreadyLearned(q)) return;
+    const qna = getQna();
+    qna.unshift({
+      id: uid(),
+      question: q,
+      answer: answerText,
+      addedAt: Date.now(),
+      auto: true,
+      sourceDocIds: sourceDocIds || [],
+      sourceDocTitles: sourceDocTitles || []
+    });
+    setQna(qna.slice(0, 400));
+    refreshQnaListIfOpen();
+  }
+
+  function refreshQnaListIfOpen(){
+    const panel = document.querySelector('[data-panel="learn"]');
+    if (panel && !panel.classList.contains("hidden")) refreshQnaList();
+  }
+
+  /* auto-learn seed entries straight from a newly registered document, so the
+     bot has a head start even before anyone asks it a question */
+  function autoLearnFromDoc(doc){
+    if (!getAutoLearn()) return;
+    const chunks = chunkDoc(doc).slice(0, 3);
+    if (chunks.length === 0) return;
+    const question = doc.title.trim();
+    if (question.length < 2) return;
+    if (isAlreadyLearned(question)) return;
+    const answerText = chunks.map(c => trimText(c.text, 420)).join("\n\n— — —\n\n");
+    const qna = getQna();
+    qna.unshift({
+      id: uid(),
+      question,
+      answer: answerText,
+      addedAt: Date.now(),
+      auto: true,
+      sourceDocIds: [doc.id],
+      sourceDocTitles: [doc.title]
+    });
+    setQna(qna.slice(0, 400));
+  }
+
+  /* when a document is removed, drop auto-learned entries that depended only on it,
+     so the bot never keeps citing material that no longer exists */
+  function pruneAutoLearnedForDoc(docId){
+    const remainingDocIds = new Set(getDocs().map(d => d.id));
+    const qna = getQna().filter(item=>{
+      if (!item.auto || !item.sourceDocIds || item.sourceDocIds.length === 0) return true;
+      const stillHasSource = item.sourceDocIds.some(id => remainingDocIds.has(id));
+      return stillHasSource;
+    });
+    setQna(qna);
+  }
+
+  function trimText(t, max){
+    t = t.trim();
+    if (t.length <= max) return t;
+    return t.slice(0, max).trim() + "…";
+  }
+
+  function logUnanswered(question){
+    const list = getUnanswered();
+    const dup = list.find(u => u.question.trim() === question.trim());
+    if (dup){ dup.count = (dup.count||1) + 1; dup.askedAt = Date.now(); }
+    else list.unshift({ id: uid(), question: question.trim(), askedAt: Date.now(), count: 1 });
+    setUnanswered(list.slice(0, 200));
+  }
+
+  function answerQuery(query){
+    const qnaHit = findQnaMatch(query);
+    if (qnaHit){
+      const cite = (qnaHit.sourceDocTitles && qnaHit.sourceDocTitles.length)
+        ? `참고 자료: ${qnaHit.sourceDocTitles.join(", ")}`
+        : null;
+      return { tag: qnaHit.auto ? "자동 학습된 답변" : "학습된 답변", text: qnaHit.answer, cite };
+    }
+
+    const docs = getDocs();
+    if (docs.length === 0){
+      logUnanswered(query);
+      return { tag: null, text: "아직 등록된 자료가 없어서 답변을 드리기 어려워요. 관리자 모드 → 데이터 탭에서 법령이나 지침 자료를 먼저 등록해주세요.", cite: null };
+    }
+
+    const qTokens = tokenize(query);
+    const index = buildIndex();
+    const scored = index
+      .map(c => ({ c, s: scoreChunk(qTokens, c, query) }))
+      .filter(x => x.s > 0)
+      .sort((a,b)=> b.s - a.s);
+
+    const threshold = Math.max(1, Math.ceil(qTokens.length * 0.3));
+    const top = scored.filter(x => x.s >= threshold).slice(0, 2);
+
+    if (top.length === 0){
+      logUnanswered(query);
+      return { tag: null, text: "죄송해요, 등록된 자료에서 관련 내용을 찾지 못했어요. 이 질문은 관리자에게 전달되어 학습 자료 보강에 활용돼요. 표현을 조금 바꿔서 다시 질문해 보셔도 좋아요.", cite: null };
+    }
+
+    const parts = top.map(x => trimText(x.c.text, 420));
+    const sourceDocTitles = [...new Set(top.map(x => x.c.docTitle))];
+    const sourceDocIds = [...new Set(top.map(x => x.c.docId))];
+    const answerText = parts.join("\n\n— — —\n\n");
+
+    autoSaveLearnedAnswer(query, answerText, sourceDocIds, sourceDocTitles);
+
+    return {
+      tag: "자료 기반 답변",
+      text: answerText,
+      cite: `참고 자료: ${sourceDocTitles.join(", ")} (자동 추출 결과이며, 정확한 해석은 원문을 확인하세요)`
+    };
+  }
+
+  /* ================= CHAT UI ================= */
+  const chatLog = $("#chatLog");
+
+  function addMsg(role, html){
+    const row = document.createElement("div");
+    row.className = "msg-row " + role;
+    let avatar = "";
+    if (role === "bot") avatar = `<div class="msg-avatar"><img src="./icon-192.png" alt=""/></div>`;
+    row.innerHTML = avatar + `<div class="bubble">${html}</div>`;
+    chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return row;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  }
+
+  function renderGreeting(){
+    chatLog.innerHTML = "";
+    addMsg("bot", "안녕하세요! 저는 정심이에요 😊<br>업무와 관련하여 궁금한 사항을 질문해 주세요.");
+    if (getDocs().length === 0){
+      const el = document.createElement("div");
+      el.className = "empty-state";
+      el.textContent = "아직 등록된 자료가 없어요. 관리자 모드(⚙️)에서 법령·지침 자료를 등록하면 정심이가 답변할 수 있어요.";
+      chatLog.appendChild(el);
+    }
+  }
+
+  function renderFaqChips(){
+    const wrap = $("#faqScroll");
+    const docs = getDocs();
+    let chips = [];
+    if (docs.length > 0){
+      chips = docs.slice(0,4).map(d => `${d.title}에 대해 알려주세요`);
+    } else {
+      chips = ["보호처분의 종류와 기간을 알려주세요", "소년원 징계 종류는 무엇인가요?"];
+    }
+    wrap.innerHTML = "";
+    chips.forEach(q=>{
+      const b = document.createElement("button");
+      b.className = "faq-chip";
+      b.textContent = q;
+      b.addEventListener("click", ()=> sendMessage(q));
+      wrap.appendChild(b);
+    });
+  }
+
+  function sendMessage(text){
+    text = (text||"").trim();
+    if (!text) return;
+    addMsg("user", escapeHtml(text));
+    $("#chatInput").value = "";
+    autoGrow($("#chatInput"));
+
+    const typingRow = addMsg("bot", `<div class="typing"><span></span><span></span><span></span></div>`);
+
+    setTimeout(()=>{
+      typingRow.remove();
+      const res = answerQuery(text);
+      let html = "";
+      if (res.tag) html += `<span class="tag">${res.tag}</span><br>`;
+      html += escapeHtml(res.text).replace(/\n/g,"<br>");
+      if (res.cite) html += `<span class="cite">${escapeHtml(res.cite)}</span>`;
+      addMsg("bot", html);
+    }, 380 + Math.random()*260);
+  }
+
+  $("#sendBtn").addEventListener("click", ()=> sendMessage($("#chatInput").value));
+  $("#chatInput").addEventListener("keydown", e=>{
+    if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); sendMessage($("#chatInput").value); }
+  });
+  function autoGrow(el){ el.style.height="auto"; el.style.height = Math.min(el.scrollHeight,120)+"px"; }
+  $("#chatInput").addEventListener("input", e=> autoGrow(e.target));
+
+  /* ================= ADMIN DRAWER ================= */
+  const adminOverlay = $("#adminOverlay");
+  const adminGate = $("#adminGate");
+  const adminAuthed = $("#adminAuthed");
+
+  $("#openAdminBtn").addEventListener("click", ()=>{
+    adminOverlay.classList.remove("hidden");
+    adminGate.classList.remove("hidden");
+    adminAuthed.classList.add("hidden");
+    $("#drawerTitle").textContent = "관리자 모드";
+    $("#drawerBackBtn").classList.add("hidden");
+    $("#adminGatePw").value = "";
+    setTimeout(()=> $("#adminGatePw").focus(), 60);
+  });
+  $("#closeAdminBtn").addEventListener("click", ()=> adminOverlay.classList.add("hidden"));
+  adminOverlay.addEventListener("click", e=>{ if (e.target === adminOverlay) adminOverlay.classList.add("hidden"); });
+
+  $("#adminGateBtn").addEventListener("click", tryAdminAuth);
+  $("#adminGatePw").addEventListener("keydown", e=>{ if(e.key==="Enter") tryAdminAuth(); });
+  function tryAdminAuth(){
+    if ($("#adminGatePw").value === store.get("adminPw", null)){
+      adminGate.classList.add("hidden");
+      adminAuthed.classList.remove("hidden");
+      $("#drawerTitle").textContent = "관리자 모드";
+      $("#drawerBackBtn").classList.remove("hidden");
+      refreshDocList();
+      refreshQnaList();
+      refreshUnansweredList();
+      $("#autoLearnToggle").checked = getAutoLearn();
+    } else {
+      toast("관리자 비밀번호가 올바르지 않아요.");
+    }
+  }
+  $("#drawerBackBtn").addEventListener("click", ()=>{
+    adminAuthed.classList.add("hidden");
+    adminGate.classList.remove("hidden");
+    $("#drawerBackBtn").classList.add("hidden");
+  });
+
+  /* tabs */
+  $$(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      $$(".tab-btn").forEach(b=> b.classList.remove("active"));
+      btn.classList.add("active");
+      $$("[data-panel]").forEach(p=> p.classList.add("hidden"));
+      $(`[data-panel="${btn.dataset.tab}"]`).classList.remove("hidden");
+      if (btn.dataset.tab === "data") refreshDocList();
+      if (btn.dataset.tab === "learn"){
+        refreshQnaList();
+        refreshUnansweredList();
+        $("#autoLearnToggle").checked = getAutoLearn();
+      }
+    });
+  });
+
+  /* 접속/관리자 비밀번호 변경 */
+  $("#saveAccessPwBtn").addEventListener("click", ()=>{
+    const a = $("#newAccessPw").value.trim(), b = $("#newAccessPw2").value.trim();
+    if (a.length < 4){ toast("4자리 이상 입력해주세요."); return; }
+    if (a !== b){ toast("비밀번호가 서로 달라요."); return; }
+    store.set("accessPw", a);
+    $("#newAccessPw").value=""; $("#newAccessPw2").value="";
+    toast("접속 비밀번호가 변경됐어요.");
+  });
+  $("#saveAdminPwBtn").addEventListener("click", ()=>{
+    const a = $("#newAdminPw").value.trim(), b = $("#newAdminPw2").value.trim();
+    if (a.length < 4){ toast("4자리 이상 입력해주세요."); return; }
+    if (a !== b){ toast("비밀번호가 서로 달라요."); return; }
+    store.set("adminPw", a);
+    $("#newAdminPw").value=""; $("#newAdminPw2").value="";
+    toast("관리자 비밀번호가 변경됐어요.");
+  });
+
+  /* ---- data tab: file upload ---- */
+  const uploadZone = $("#uploadZone");
+  const fileInput = $("#fileInput");
+  uploadZone.addEventListener("click", ()=> fileInput.click());
+  ["dragover","dragenter"].forEach(ev=> uploadZone.addEventListener(ev, e=>{ e.preventDefault(); uploadZone.style.borderColor="var(--gold)"; }));
+  ["dragleave","drop"].forEach(ev=> uploadZone.addEventListener(ev, e=>{ e.preventDefault(); uploadZone.style.borderColor=""; }));
+  uploadZone.addEventListener("drop", e=>{ handleFiles(e.dataTransfer.files); });
+  fileInput.addEventListener("change", e=> handleFiles(e.target.files));
+
+  let pdfjsReady = null;
+  function ensurePdfJs(){
+    if (pdfjsReady) return pdfjsReady;
+    pdfjsReady = new Promise((resolve, reject)=>{
+      if (window.pdfjsLib) return resolve(window.pdfjsLib);
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = ()=>{
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = ()=> reject(new Error("pdf-load-failed"));
+      document.head.appendChild(s);
+    });
+    return pdfjsReady;
+  }
+
+  async function extractPdfText(arrayBuffer){
+    const pdfjsLib = await ensurePdfJs();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = "";
+    for (let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it=> it.str).join(" ") + "\n\n";
+    }
+    return text;
+  }
+
+  async function handleFiles(fileList){
+    const files = Array.from(fileList||[]);
+    if (files.length === 0) return;
+    toast(`${files.length}개 파일을 처리 중이에요...`);
+    const docs = getDocs();
+    for (const f of files){
+      try{
+        let text = "";
+        if (/\.pdf$/i.test(f.name)){
+          const buf = await f.arrayBuffer();
+          text = await extractPdfText(buf);
+        } else {
+          text = await f.text();
+        }
+        text = text.trim();
+        if (!text){ toast(`${f.name}: 추출된 텍스트가 없어요.`); continue; }
+        const newDoc = { id: uid(), title: f.name.replace(/\.(txt|md|pdf)$/i,""), content: text, chars: text.length, addedAt: Date.now() };
+        docs.push(newDoc);
+        autoLearnFromDoc(newDoc);
+        refreshQnaListIfOpen();
+      }catch(err){
+        toast(`${f.name} 처리 중 오류가 발생했어요. (PDF 로딩은 인터넷 연결이 필요해요)`);
+      }
+    }
+    setDocs(docs);
+    refreshDocList();
+    refreshFaqIfChanged();
+    fileInput.value = "";
+    toast("자료 등록이 완료됐어요.");
+  }
+
+  $("#pasteAddBtn").addEventListener("click", ()=>{
+    const title = $("#pasteTitle").value.trim();
+    const content = $("#pasteContent").value.trim();
+    if (!title){ toast("자료 제목을 입력해주세요."); return; }
+    if (!content){ toast("내용을 입력해주세요."); return; }
+    const docs = getDocs();
+    const newDoc = { id: uid(), title, content, chars: content.length, addedAt: Date.now() };
+    docs.push(newDoc);
+    setDocs(docs);
+    autoLearnFromDoc(newDoc);
+    refreshQnaListIfOpen();
+    $("#pasteTitle").value=""; $("#pasteContent").value="";
+    refreshDocList();
+    refreshFaqIfChanged();
+    toast("텍스트 자료가 등록됐어요.");
+  });
+
+  function refreshDocList(){
+    const docs = getDocs().slice().sort((a,b)=> b.addedAt - a.addedAt);
+    $("#docCountBadge").textContent = docs.length + "개";
+    const wrap = $("#docList");
+    wrap.innerHTML = "";
+    if (docs.length === 0){
+      wrap.innerHTML = `<div class="empty-mini">아직 등록된 자료가 없어요.</div>`;
+      return;
+    }
+    docs.forEach(d=>{
+      const card = document.createElement("div");
+      card.className = "doc-card";
+      card.innerHTML = `
+        <div class="doc-icon">📄</div>
+        <div class="doc-meta">
+          <div class="doc-title">${escapeHtml(d.title)}</div>
+          <div class="doc-sub">${(d.chars||0).toLocaleString()}자 · ${fmtDate(d.addedAt)}</div>
+        </div>
+        <button class="doc-trash" title="삭제">🗑</button>
+      `;
+      card.querySelector(".doc-trash").addEventListener("click", ()=>{
+        if (!confirm(`"${d.title}" 자료를 삭제할까요?`)) return;
+        setDocs(getDocs().filter(x=> x.id !== d.id));
+        pruneAutoLearnedForDoc(d.id);
+        refreshDocList();
+        refreshFaqIfChanged();
+        refreshQnaListIfOpen();
+        toast("삭제됐어요.");
+      });
+      wrap.appendChild(card);
+    });
+  }
+
+  function refreshFaqIfChanged(){ if (!chatScreen.classList.contains("hidden")) renderFaqChips(); }
+
+  /* ---- learn tab ---- */
+  function refreshUnansweredList(){
+    const list = getUnanswered();
+    const wrap = $("#unansweredList");
+    wrap.innerHTML = "";
+    if (list.length === 0){
+      wrap.innerHTML = `<div class="empty-mini">아직 답변하지 못한 질문이 없어요. 👍</div>`;
+      return;
+    }
+    list.forEach(item=>{
+      const card = document.createElement("div");
+      card.className = "qa-log-card";
+      card.innerHTML = `
+        <div class="qa-log-q">${escapeHtml(item.question)}</div>
+        <div class="qa-log-time">${fmtDate(item.askedAt)} · ${item.count||1}회 질문됨</div>
+        <textarea class="input" placeholder="이 질문에 대한 답변을 입력하세요"></textarea>
+        <div class="qa-log-actions">
+          <button class="btn btn-danger" data-act="dismiss">삭제</button>
+          <button class="btn btn-ghost btn-sm" data-act="save">답변 저장</button>
+        </div>
+      `;
+      card.querySelector('[data-act="dismiss"]').addEventListener("click", ()=>{
+        setUnanswered(getUnanswered().filter(x=> x.id !== item.id));
+        refreshUnansweredList();
+      });
+      card.querySelector('[data-act="save"]').addEventListener("click", ()=>{
+        const ans = card.querySelector("textarea").value.trim();
+        if (!ans){ toast("답변을 입력해주세요."); return; }
+        const qna = getQna();
+        qna.unshift({ id: uid(), question: item.question, answer: ans, addedAt: Date.now() });
+        setQna(qna);
+        setUnanswered(getUnanswered().filter(x=> x.id !== item.id));
+        refreshUnansweredList();
+        refreshQnaList();
+        toast("학습 데이터로 저장했어요. 다음부터 정확히 답할 수 있어요!");
+      });
+      wrap.appendChild(card);
+    });
+  }
+
+  $("#autoLearnToggle").addEventListener("change", (e)=>{
+    setAutoLearn(e.target.checked);
+    toast(e.target.checked ? "자동학습을 켰어요." : "자동학습을 껐어요.");
+  });
+
+  $("#manualAddBtn").addEventListener("click", ()=>{
+    const q = $("#manualQ").value.trim();
+    const a = $("#manualA").value.trim();
+    if (!q || !a){ toast("질문과 답변을 모두 입력해주세요."); return; }
+    const qna = getQna();
+    qna.unshift({ id: uid(), question: q, answer: a, addedAt: Date.now() });
+    setQna(qna);
+    $("#manualQ").value=""; $("#manualA").value="";
+    refreshQnaList();
+    toast("학습 데이터가 추가됐어요.");
+  });
+
+  function refreshQnaList(){
+    const list = getQna();
+    $("#qnaCountBadge").textContent = list.length + "개";
+    const wrap = $("#qnaList");
+    wrap.innerHTML = "";
+    if (list.length === 0){
+      wrap.innerHTML = `<div class="empty-mini">저장된 학습 데이터가 없어요.</div>`;
+      return;
+    }
+    list.forEach(item=>{
+      const card = document.createElement("div");
+      card.className = "qna-card";
+      const badge = item.auto
+        ? `<span class="badge auto-badge">🤖 자동학습</span>`
+        : `<span class="badge manual-badge">🧑‍💼 관리자 등록</span>`;
+      const srcLine = (item.sourceDocTitles && item.sourceDocTitles.length)
+        ? `<div class="qna-src">출처: ${escapeHtml(item.sourceDocTitles.join(", "))}</div>`
+        : "";
+      card.innerHTML = `
+        <div class="qna-top">${badge}</div>
+        <div class="qna-q">Q. ${escapeHtml(item.question)}</div>
+        <div class="qna-a">${escapeHtml(item.answer)}</div>
+        ${srcLine}
+        <div class="qna-foot"><button class="btn btn-danger">삭제</button></div>
+      `;
+      card.querySelector("button").addEventListener("click", ()=>{
+        setQna(getQna().filter(x=> x.id !== item.id));
+        refreshQnaList();
+        toast("삭제됐어요.");
+      });
+      wrap.appendChild(card);
+    });
+  }
+
+  /* ================= PWA service worker ================= */
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+    });
+  }
+
+  /* ================= boot ================= */
+  initTheme();
+  updateClock();
+  setInterval(updateClock, 15000);
+  loadWeather();
+  showLock();
+})();
+</script>
+</body>
+</html>

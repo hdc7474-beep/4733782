@@ -21,6 +21,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<!-- Supabase (free tier) — shared central database so every visitor sees the same registered data -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   html[data-theme="light"]{
     color-scheme: light;
@@ -99,6 +101,7 @@
     font-weight:700; font-size:15px; padding:14px 18px; transition:transform .12s ease, filter .12s ease, background .12s ease;
   }
   .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.55; cursor:default; }
   .btn-primary{ background:linear-gradient(180deg,var(--navy-hi),var(--navy)); color:#eef1ff; box-shadow:0 6px 18px -6px rgba(28,43,94,.7); }
   .btn-primary:hover{ filter:brightness(1.08); }
   .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--text-dim); }
@@ -154,6 +157,25 @@
   .info-chip .icon{ font-size:15px; line-height:1; }
   .info-chip .val{ color:var(--text); font-weight:700; }
 
+  /* ---------- LOADING / SETUP-REQUIRED SCREENS ---------- */
+  #loadingScreen, #fbSetupScreen{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:40px 24px; text-align:center; gap:14px;
+  }
+  .loading-spinner{
+    width:34px; height:34px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--gold);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #fbSetupScreen .fb-card{
+    max-width:520px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg);
+    padding:30px 26px; text-align:left;
+  }
+  #fbSetupScreen h2{ font-family:var(--serif); font-size:20px; margin:0 0 10px; text-align:center; }
+  #fbSetupScreen p{ font-size:13.5px; color:var(--text-dim); line-height:1.7; margin:0 0 10px; }
+  #fbSetupScreen ol{ font-size:13.5px; color:var(--text-dim); line-height:1.9; padding-left:20px; margin:0 0 10px; }
+  #fbSetupScreen code{ background:var(--panel-2); border:1px solid var(--line); padding:2px 6px; border-radius:6px; font-size:12.5px; color:var(--gold); }
+
   /* ---------- LOCK SCREEN ---------- */
   #lockScreen{
     flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -196,7 +218,12 @@
   }
   .icon-btn:hover{ border-color:var(--gold-dim); color:var(--gold); }
 
-  #chatLog{ flex:1; overflow-y:auto; padding:20px 14px 8px; display:flex; flex-direction:column; gap:14px; }
+  #noDataBanner{
+    margin:10px 14px 0; text-align:center; color:var(--text-faint); font-size:12.5px; padding:12px 16px;
+    border:1px dashed var(--line); border-radius:var(--radius-md); background:var(--panel-2);
+  }
+
+  #chatLog{ flex:1; overflow-y:auto; padding:14px 14px 8px; display:flex; flex-direction:column; gap:14px; }
   .msg-row{ display:flex; gap:9px; max-width:100%; }
   .msg-row.user{ justify-content:flex-end; }
   .msg-avatar{ width:30px; height:30px; border-radius:9px; flex:none; overflow:hidden; margin-top:2px; }
@@ -215,12 +242,6 @@
     padding:2px 8px; border-radius:999px;
   }
   .msg-row.user .bubble{ background:var(--navy); border-color:#2a3d84; color:#eef1ff; border-radius:16px 16px 4px 16px; }
-  .msg-row.bot .bubble{ }
-
-  .empty-state{
-    text-align:center; color:var(--text-faint); font-size:13px; padding:26px 20px; border:1px dashed var(--line);
-    border-radius:var(--radius-md); margin:6px 4px;
-  }
 
   .faq-wrap{ padding:4px 14px 12px; }
   .faq-label{ font-size:12px; color:var(--gold-dim); font-weight:700; margin-bottom:9px; }
@@ -353,6 +374,17 @@
 
   .empty-mini{ text-align:center; color:var(--text-faint); font-size:12.5px; padding:26px 10px; }
 
+  .faq-admin-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .faq-admin-row .input{ flex:1; }
+  .faq-admin-list{ display:flex; flex-direction:column; gap:8px; }
+  .faq-admin-item{
+    display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line-soft);
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:13px;
+  }
+  .faq-admin-item span{ flex:1; }
+  .faq-admin-item button{ background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:15px; }
+  .faq-admin-item button:hover{ color:var(--danger-hi); }
+
   @media (max-width:480px){
     .lock-card{ padding:24px 20px; }
     #adminDrawer{ max-width:100%; }
@@ -362,8 +394,28 @@
 <body>
 <div id="app">
 
+  <!-- ================= LOADING ================= -->
+  <section id="loadingScreen">
+    <div class="loading-spinner"></div>
+    <p style="color:var(--text-dim); font-size:13px;">불러오는 중…</p>
+  </section>
+
+  <!-- ================= SUPABASE SETUP REQUIRED ================= -->
+  <section id="fbSetupScreen" class="hidden">
+    <div class="fb-card">
+      <h2>⚙️ 관리자 설정이 필요해요</h2>
+      <p>이 앱은 모든 사용자가 같은 자료·학습 데이터를 보도록, 무료 데이터베이스(Supabase)를 연결해서 써요. 아직 연결이 안 되어 있어요.</p>
+      <ol>
+        <li><code>index.html</code> 파일을 열어 <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> 부분을 찾으세요.</li>
+        <li>Supabase 프로젝트에서 발급받은 값으로 <code>YOUR_...</code> 자리를 채워 넣으세요.</li>
+        <li>저장 후 다시 배포하면 정상적으로 열려요.</li>
+      </ol>
+      <p>자세한 방법은 함께 드린 <code>Supabase_연동_가이드.md</code> 파일을 참고해주세요.</p>
+    </div>
+  </section>
+
   <!-- ================= LOCK SCREEN ================= -->
-  <section id="lockScreen">
+  <section id="lockScreen" class="hidden">
     <button class="icon-btn theme-toggle-fixed theme-toggle-btn" id="themeToggleLock" title="다크모드 전환">🌙</button>
 
     <div class="emblem"><img src="./login-hero.png" alt="정심 캐릭터" /></div>
@@ -376,9 +428,9 @@
     </div>
 
     <!-- first-run setup -->
-    <div class="lock-card" id="setupCard">
+    <div class="lock-card hidden" id="setupCard">
       <h2>최초 설정</h2>
-      <p class="desc">처음 시작하시는군요. 사용할 비밀번호 두 가지를 정해주세요.</p>
+      <p class="desc">이 앱을 처음 여시는군요. 모두가 함께 쓸 비밀번호 두 가지를 정해주세요.</p>
 
       <label class="field-label">접속 비밀번호 (일반 사용자용)</label>
       <div class="pw-wrap">
@@ -395,7 +447,7 @@
       </div>
 
       <button class="btn btn-primary" id="setupSaveBtn">비밀번호 설정하고 시작하기</button>
-      <p class="setup-note">※ 비밀번호는 이 기기(브라우저)에만 저장되며 외부로 전송되지 않아요. 나중에 관리자 모드에서 언제든 변경할 수 있어요.</p>
+      <p class="setup-note">※ 이 비밀번호는 공용 데이터베이스에 저장되어, 이 주소로 접속하는 모든 사람에게 동일하게 적용돼요. 나중에 관리자 모드에서 언제든 변경할 수 있어요.</p>
     </div>
 
     <!-- returning user login -->
@@ -419,6 +471,8 @@
       <button class="icon-btn" id="lockAgainBtn" title="잠금">🔒</button>
       <button class="icon-btn" id="openAdminBtn" title="관리자 모드">⚙️</button>
     </div>
+
+    <div id="noDataBanner" class="hidden">아직 등록된 자료가 없어요. 관리자 모드(⚙️)에서 법령·지침 자료를 등록하면 정심이가 답변할 수 있어요.</div>
 
     <div id="chatLog"></div>
 
@@ -469,7 +523,7 @@
       <!-- 접속 비밀번호 변경 -->
       <div class="tab-panel" data-panel="access">
         <h3>접속 비밀번호 변경</h3>
-        <p class="hint">일반 사용자가 앱을 열 때 입력하는 비밀번호예요.</p>
+        <p class="hint">일반 사용자가 앱을 열 때 입력하는 비밀번호예요. 모든 사용자에게 공통으로 적용돼요.</p>
         <label class="field-label">새 접속 비밀번호</label>
         <input class="input" type="password" id="newAccessPw" placeholder="새 비밀번호" />
         <div class="field-gap">
@@ -495,7 +549,7 @@
       <!-- 데이터 -->
       <div class="tab-panel hidden" data-panel="data">
         <h3>자료 관리 <span class="count-badge" id="docCountBadge">0개</span></h3>
-        <p class="hint">법령, 지침, 업무 매뉴얼 등을 등록하면 챗봇이 해당 내용을 참고하여 답변합니다. txt·md·pdf 파일을 올리거나, 텍스트를 직접 붙여넣을 수 있어요.</p>
+        <p class="hint">법령, 지침, 업무 매뉴얼 등을 등록하면 챗봇이 해당 내용을 참고하여 답변합니다. 모든 사용자에게 실시간으로 공유돼요. txt·md·pdf 파일을 올리거나, 텍스트를 직접 붙여넣을 수 있어요.</p>
 
         <div class="upload-zone" id="uploadZone">
           <div class="up-icon">📤</div>
@@ -513,6 +567,14 @@
         </div>
         <button class="btn btn-ghost" id="pasteAddBtn" style="width:100%; margin-top:12px;">텍스트로 추가</button>
 
+        <div class="divider-label">자주 찾는 질문 (고정)</div>
+        <p class="hint">여기서 설정한 질문만 사용자 화면에 고정으로 보여요. 자료를 등록·삭제해도 바뀌지 않아요.</p>
+        <div class="faq-admin-row">
+          <input class="input" id="faqAddInput" placeholder="예: 보호처분의 종류와 기간을 알려주세요" />
+          <button class="btn btn-ghost btn-sm" id="faqAddBtn">추가</button>
+        </div>
+        <div class="faq-admin-list" id="faqAdminList"></div>
+
         <div class="divider-label">업로드된 데이터</div>
         <div id="docList"></div>
       </div>
@@ -520,7 +582,7 @@
       <!-- 학습 -->
       <div class="tab-panel hidden" data-panel="learn">
         <h3>자동학습</h3>
-        <p class="hint">정심이는 등록된 자료에서 자신 있게 찾은 답변을 자동으로 학습해서, 같은 질문엔 다음부터 더 빠르고 일관되게 답해요. 자료를 새로 등록할 때도 핵심 내용을 미리 스스로 학습해둬요.</p>
+        <p class="hint">정심이는 등록된 자료에서 자신 있게 찾은 답변을 자동으로 학습해서, 같은 질문엔 다음부터 더 빠르고 일관되게 답해요. 모든 사용자가 함께 이 학습 데이터를 공유해요.</p>
 
         <div class="toggle-row">
           <div class="toggle-copy">
@@ -557,15 +619,14 @@
 (function(){
   "use strict";
 
-  /* ---------------- storage helpers ---------------- */
-  const NS = "jeongsim_";
-  const store = {
-    get(key, fallback){
-      try{ const v = localStorage.getItem(NS+key); return v===null ? fallback : JSON.parse(v); }
-      catch(e){ return fallback; }
-    },
-    set(key, val){ try{ localStorage.setItem(NS+key, JSON.stringify(val)); }catch(e){ toast("저장 공간이 부족해요. 오래된 자료를 정리해주세요."); } },
-  };
+  /* =====================================================================
+     SUPABASE 설정 — 반드시 아래 두 값을 본인의 Supabase 프로젝트 값으로 바꿔주세요.
+     Supabase 대시보드 → 프로젝트 설정(⚙️) → API 에서 그대로 복사할 수 있어요.
+     자세한 방법은 함께 드린 Supabase_연동_가이드.md 를 참고하세요.
+     ===================================================================== */
+  const SUPABASE_URL = "https://dkbczmkoattqqyivojmh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrYmN6bWtvYXR0cXF5aXZvam1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5Mjk0MTIsImV4cCI6MjEwMjUwNTQxMn0.IX_KPoH55QoBYZO5tHC7W3BEChxE2QYazoFrG0hQKCk";
+  const SUPABASE_CONFIGURED = SUPABASE_URL.indexOf("YOUR_") !== 0 && SUPABASE_ANON_KEY.indexOf("YOUR_") !== 0;
 
   const $ = (sel, root) => (root||document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
@@ -585,17 +646,35 @@
     return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
-  /* ---------------- theme (light = sky blue default, dark = original) ---------------- */
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  }
+
+  function showScreen(name){
+    $("#loadingScreen").classList.toggle("hidden", name !== "loading");
+    $("#fbSetupScreen").classList.toggle("hidden", name !== "fbsetup");
+    $("#lockScreen").classList.toggle("hidden", name !== "lock");
+    $("#chatScreen").classList.toggle("hidden", name !== "chat");
+  }
+
+  if (!SUPABASE_CONFIGURED){
+    showScreen("fbsetup");
+    return; // stop here — nothing else can work without a configured database
+  }
+
+  /* ---------------- theme (light = sky blue default, dark = original) — stays local per device, that's fine ---------------- */
+  const themeStore = {
+    get(key, fallback){ try{ const v = localStorage.getItem("jeongsim_"+key); return v===null?fallback:JSON.parse(v);}catch(e){ return fallback; } },
+    set(key, val){ try{ localStorage.setItem("jeongsim_"+key, JSON.stringify(val)); }catch(e){} }
+  };
   function applyTheme(theme){
     document.documentElement.setAttribute("data-theme", theme);
     const meta = document.getElementById("themeColorMeta");
     if (meta) meta.setAttribute("content", theme === "dark" ? "#15160e" : "#bfe3fb");
     $$(".theme-toggle-btn").forEach(b => b.textContent = theme === "dark" ? "☀️" : "🌙");
-    store.set("theme", theme);
+    themeStore.set("theme", theme);
   }
-  function initTheme(){
-    applyTheme(store.get("theme", "light"));
-  }
+  function initTheme(){ applyTheme(themeStore.get("theme", "light")); }
   function toggleTheme(){
     const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
     applyTheme(cur === "dark" ? "light" : "dark");
@@ -627,10 +706,7 @@
     const valEl = document.getElementById("weatherVal");
     const iconEl = document.getElementById("weatherIcon");
     if (!valEl) return;
-    if (!("geolocation" in navigator)){
-      valEl.textContent = "날씨 정보를 사용할 수 없어요";
-      return;
-    }
+    if (!("geolocation" in navigator)){ valEl.textContent = "날씨 정보를 사용할 수 없어요"; return; }
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
@@ -658,18 +734,44 @@
     });
   });
 
+  /* =====================================================================
+     SUPABASE — shared central database.
+     Every visitor's browser reads the SAME docs/qna/config in real time,
+     which is what makes registration and answers consistent for everyone.
+     ===================================================================== */
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let docsCache = [];
+  let qnaCache = [];
+  let unansweredCache = [];
+  let appConfig = null;
+  let configLoaded = false;
+
+  async function sbUpsert(table, row){
+    const { error } = await sb.from(table).upsert(row);
+    if (error) throw error;
+  }
+  async function sbDelete(table, id){
+    const { error } = await sb.from(table).delete().eq("id", id);
+    if (error) throw error;
+  }
+  function fsUpdateConfig(partial){ return sbUpsert("config", { id: "app", ...partial }); }
+
+  function getDocs(){ return docsCache; }
+  function getQna(){ return qnaCache; }
+  function getUnanswered(){ return unansweredCache; }
+  function getAutoLearn(){ return !appConfig || appConfig.auto_learn !== false; }
+  function getFaqList(){ return (appConfig && Array.isArray(appConfig.faq_list)) ? appConfig.faq_list : []; }
+
   /* ================= AUTH / LOCK SCREEN ================= */
   const lockScreen = $("#lockScreen");
   const chatScreen = $("#chatScreen");
   const setupCard = $("#setupCard");
   const loginCard = $("#loginCard");
 
-  function hasAccounts(){ return !!store.get("accessPw", null) && !!store.get("adminPw", null); }
-
   function showLock(){
-    chatScreen.classList.add("hidden");
-    lockScreen.classList.remove("hidden");
-    if (hasAccounts()){
+    showScreen("lock");
+    if (appConfig && appConfig.access_pw){
       setupCard.classList.add("hidden");
       loginCard.classList.remove("hidden");
       $("#loginPw").value = "";
@@ -680,26 +782,27 @@
     }
   }
 
-  $("#setupSaveBtn").addEventListener("click", ()=>{
+  $("#setupSaveBtn").addEventListener("click", async ()=>{
     const a = $("#setupAccessPw").value.trim();
     const b = $("#setupAdminPw").value.trim();
     if (a.length < 4){ toast("접속 비밀번호는 4자리 이상으로 설정해주세요."); return; }
     if (b.length < 4){ toast("관리자 비밀번호는 4자리 이상으로 설정해주세요."); return; }
-    store.set("accessPw", a);
-    store.set("adminPw", b);
-    toast("설정이 완료됐어요!");
-    enterChat();
+    const btn = $("#setupSaveBtn"); btn.disabled = true;
+    try{
+      await fsUpdateConfig({ access_pw: a, admin_pw: b, auto_learn: true, faq_list: [] });
+      toast("설정이 완료됐어요! 이제 모두가 이 비밀번호로 접속할 수 있어요.");
+      enterChat();
+    }catch(e){
+      toast("저장 중 오류가 발생했어요. 인터넷 연결과 Supabase 설정을 확인해주세요.");
+    }finally{ btn.disabled = false; }
   });
 
   $("#loginBtn").addEventListener("click", tryLogin);
   $("#loginPw").addEventListener("keydown", e=>{ if(e.key==="Enter") tryLogin(); });
   function tryLogin(){
     const v = $("#loginPw").value;
-    if (v === store.get("accessPw", null)){
-      enterChat();
-    } else {
-      toast("비밀번호가 올바르지 않아요.");
-    }
+    if (appConfig && v === appConfig.access_pw){ enterChat(); }
+    else toast("비밀번호가 올바르지 않아요.");
   }
 
   $("#lockAgainBtn").addEventListener("click", showLock);
@@ -707,21 +810,11 @@
   $("#themeToggleChat").addEventListener("click", toggleTheme);
 
   function enterChat(){
-    lockScreen.classList.add("hidden");
-    chatScreen.classList.remove("hidden");
+    showScreen("chat");
     renderFaqChips();
-    if ($("#chatLog").children.length === 0) renderGreeting();
+    renderGreeting();
+    refreshNoDataBanner();
   }
-
-  /* ================= DOCUMENT STORE ================= */
-  function getDocs(){ return store.get("docs", []); }
-  function setDocs(docs){ store.set("docs", docs); }
-  function getQna(){ return store.get("qna", []); }
-  function setQna(v){ store.set("qna", v); }
-  function getAutoLearn(){ return store.get("autoLearn", true); }
-  function setAutoLearn(v){ store.set("autoLearn", !!v); }
-  function getUnanswered(){ return store.get("unanswered", []); }
-  function setUnanswered(v){ store.set("unanswered", v); }
 
   /* ================= ANSWER ENGINE ================= */
   const STOPWORDS = new Set(["은","는","이","가","을","를","의","에","에서","으로","로","와","과","도","만","좀","요","입니까","인가요","무엇","뭐","뭔가요","알려주세요","알려줘","궁금해요","궁금합니다","합니다","있나요","해주세요","그리고","그럼","저는","제가","입니다","하나요","한가요","해요","인지","대해","대한","무엇인가요"]);
@@ -735,24 +828,26 @@
       .filter(w => w.length > 1 && !STOPWORDS.has(w));
   }
 
-  function chunkDoc(doc){
-    const raw = doc.content.split(/\n{2,}/).map(s=>s.trim()).filter(Boolean);
-    const chunks = [];
-    let buf = "";
-    raw.forEach(p=>{
-      if ((buf + p).length > 480 && buf){ chunks.push(buf); buf = p; }
-      else buf = buf ? buf + "\n" + p : p;
-    });
-    if (buf) chunks.push(buf);
-    if (chunks.length === 0 && doc.content.trim()) chunks.push(doc.content.trim());
-    return chunks.map(c => ({ docId: doc.id, docTitle: doc.title, text: c, tokens: tokenize(c) }));
+  /* split document text into individual sentences so answers can quote just the
+     1-3 most relevant sentences instead of dumping whole raw paragraphs */
+  function splitSentences(text){
+    const clean = (text||"").replace(/\r/g,"").replace(/[ \t]+/g," ").trim();
+    if (!clean) return [];
+    const rough = clean.split(/\n+/).flatMap(line =>
+      line.split(/(?<=[.?!다요음함까됨임됩니다습니다])\s+(?=[^\s])/g)
+    );
+    return rough.map(s=>s.trim()).filter(s => s.length >= 4);
   }
 
-  function buildIndex(){
-    const docs = getDocs();
-    let chunks = [];
-    docs.forEach(d => { chunks = chunks.concat(chunkDoc(d)); });
-    return chunks;
+  function buildSentenceIndex(){
+    let out = [];
+    docsCache.forEach(d=>{
+      const sentences = splitSentences(d.content);
+      sentences.forEach((s, idx)=>{
+        out.push({ docId: d.id, docTitle: d.title, text: s, idx, tokens: tokenize(s) });
+      });
+    });
+    return out;
   }
 
   function tokenRelated(a, b){
@@ -766,22 +861,19 @@
     return lcp >= required && lcp >= 2;
   }
 
-  function scoreChunk(queryTokens, chunk, rawQuery){
-    if (chunk.tokens.length === 0) return 0;
+  function scoreItem(queryTokens, itemTokens, itemText, rawQuery){
+    if (itemTokens.length === 0) return 0;
     let score = 0;
-    queryTokens.forEach(qt => {
-      if (chunk.tokens.some(dt => tokenRelated(qt, dt))) score += 1;
-    });
-    if (rawQuery.length > 3 && chunk.text.includes(rawQuery.trim())) score += 5;
+    queryTokens.forEach(qt => { if (itemTokens.some(dt => tokenRelated(qt, dt))) score += 1; });
+    if (rawQuery.length > 3 && itemText.includes(rawQuery.trim())) score += 5;
     return score;
   }
 
   function findQnaMatch(query){
     const qTokens = tokenize(query);
     if (qTokens.length === 0) return null;
-    const list = getQna();
     let best = null, bestScore = 0;
-    list.forEach(item=>{
+    getQna().forEach(item=>{
       const iTokens = tokenize(item.question);
       if (iTokens.length === 0) return;
       let overlap = 0;
@@ -793,68 +885,7 @@
     return null;
   }
 
-  function isAlreadyLearned(query){
-    return !!findQnaMatch(query);
-  }
-
-  function autoSaveLearnedAnswer(question, answerText, sourceDocIds, sourceDocTitles){
-    if (!getAutoLearn()) return;
-    const q = question.trim();
-    if (q.length < 4) return;
-    if (isAlreadyLearned(q)) return;
-    const qna = getQna();
-    qna.unshift({
-      id: uid(),
-      question: q,
-      answer: answerText,
-      addedAt: Date.now(),
-      auto: true,
-      sourceDocIds: sourceDocIds || [],
-      sourceDocTitles: sourceDocTitles || []
-    });
-    setQna(qna.slice(0, 400));
-    refreshQnaListIfOpen();
-  }
-
-  function refreshQnaListIfOpen(){
-    const panel = document.querySelector('[data-panel="learn"]');
-    if (panel && !panel.classList.contains("hidden")) refreshQnaList();
-  }
-
-  /* auto-learn seed entries straight from a newly registered document, so the
-     bot has a head start even before anyone asks it a question */
-  function autoLearnFromDoc(doc){
-    if (!getAutoLearn()) return;
-    const chunks = chunkDoc(doc).slice(0, 3);
-    if (chunks.length === 0) return;
-    const question = doc.title.trim();
-    if (question.length < 2) return;
-    if (isAlreadyLearned(question)) return;
-    const answerText = chunks.map(c => trimText(c.text, 420)).join("\n\n— — —\n\n");
-    const qna = getQna();
-    qna.unshift({
-      id: uid(),
-      question,
-      answer: answerText,
-      addedAt: Date.now(),
-      auto: true,
-      sourceDocIds: [doc.id],
-      sourceDocTitles: [doc.title]
-    });
-    setQna(qna.slice(0, 400));
-  }
-
-  /* when a document is removed, drop auto-learned entries that depended only on it,
-     so the bot never keeps citing material that no longer exists */
-  function pruneAutoLearnedForDoc(docId){
-    const remainingDocIds = new Set(getDocs().map(d => d.id));
-    const qna = getQna().filter(item=>{
-      if (!item.auto || !item.sourceDocIds || item.sourceDocIds.length === 0) return true;
-      const stillHasSource = item.sourceDocIds.some(id => remainingDocIds.has(id));
-      return stillHasSource;
-    });
-    setQna(qna);
-  }
+  function isAlreadyLearned(query){ return !!findQnaMatch(query); }
 
   function trimText(t, max){
     t = t.trim();
@@ -862,55 +893,109 @@
     return t.slice(0, max).trim() + "…";
   }
 
-  function logUnanswered(question){
-    const list = getUnanswered();
-    const dup = list.find(u => u.question.trim() === question.trim());
-    if (dup){ dup.count = (dup.count||1) + 1; dup.askedAt = Date.now(); }
-    else list.unshift({ id: uid(), question: question.trim(), askedAt: Date.now(), count: 1 });
-    setUnanswered(list.slice(0, 200));
+  function composeAnswer(sentences){
+    const bullets = sentences.map(s => "• " + trimText(s, 220)).join("\n");
+    return `등록된 자료를 확인해보니, 핵심 내용은 다음과 같아요.\n\n${bullets}`;
+  }
+
+  async function autoSaveLearnedAnswer(question, answerText, sourceDocIds, sourceDocTitles){
+    if (!getAutoLearn()) return;
+    const q = question.trim();
+    if (q.length < 4) return;
+    if (isAlreadyLearned(q)) return;
+    try{
+      await sbUpsert("qna", {
+        id: uid(), question: q, answer: answerText, added_at: Date.now(), auto: true,
+        source_doc_ids: sourceDocIds || [], source_doc_titles: sourceDocTitles || []
+      });
+    }catch(e){ /* background learning failure is non-critical */ }
+  }
+
+  /* auto-learn a seed entry straight from a newly registered document, so the
+     bot has a head start even before anyone asks it a question */
+  async function autoLearnFromDoc(doc){
+    if (!getAutoLearn()) return;
+    const sentences = splitSentences(doc.content).slice(0, 3);
+    if (sentences.length === 0) return;
+    const question = doc.title.trim();
+    if (question.length < 2) return;
+    if (isAlreadyLearned(question)) return;
+    try{
+      await sbUpsert("qna", {
+        id: uid(), question, answer: composeAnswer(sentences), added_at: Date.now(), auto: true,
+        source_doc_ids: [doc.id], source_doc_titles: [doc.title]
+      });
+    }catch(e){}
+  }
+
+  /* when a document is removed, drop auto-learned entries that cited it,
+     so the bot never keeps referencing material that no longer exists */
+  async function pruneAutoLearnedForDoc(docId){
+    const toDelete = qnaCache.filter(item => item.source_doc_ids && item.source_doc_ids.includes(docId));
+    for (const item of toDelete){
+      try{ await sbDelete("qna", item.id); }catch(e){}
+    }
+  }
+
+  async function logUnanswered(question){
+    const q = question.trim();
+    const dup = unansweredCache.find(u => u.question.trim() === q);
+    try{
+      if (dup){
+        await sbUpsert("unanswered", { id: dup.id, question: dup.question, asked_at: Date.now(), count: (dup.count||1)+1 });
+      } else {
+        await sbUpsert("unanswered", { id: uid(), question: q, asked_at: Date.now(), count: 1 });
+      }
+    }catch(e){}
   }
 
   function answerQuery(query){
     const qnaHit = findQnaMatch(query);
     if (qnaHit){
-      const cite = (qnaHit.sourceDocTitles && qnaHit.sourceDocTitles.length)
-        ? `참고 자료: ${qnaHit.sourceDocTitles.join(", ")}`
+      const cite = (qnaHit.source_doc_titles && qnaHit.source_doc_titles.length)
+        ? `참고 자료: ${qnaHit.source_doc_titles.join(", ")}`
         : null;
       return { tag: qnaHit.auto ? "자동 학습된 답변" : "학습된 답변", text: qnaHit.answer, cite };
     }
 
-    const docs = getDocs();
-    if (docs.length === 0){
+    if (docsCache.length === 0){
       logUnanswered(query);
       return { tag: null, text: "아직 등록된 자료가 없어서 답변을 드리기 어려워요. 관리자 모드 → 데이터 탭에서 법령이나 지침 자료를 먼저 등록해주세요.", cite: null };
     }
 
     const qTokens = tokenize(query);
-    const index = buildIndex();
+    const index = buildSentenceIndex();
+    const threshold = Math.max(1, Math.ceil(qTokens.length * 0.34));
     const scored = index
-      .map(c => ({ c, s: scoreChunk(qTokens, c, query) }))
-      .filter(x => x.s > 0)
-      .sort((a,b)=> b.s - a.s);
+      .map(s => ({ s, sc: scoreItem(qTokens, s.tokens, s.text, query) }))
+      .filter(x => x.sc >= threshold)
+      .sort((a,b)=> b.sc - a.sc);
 
-    const threshold = Math.max(1, Math.ceil(qTokens.length * 0.3));
-    const top = scored.filter(x => x.s >= threshold).slice(0, 2);
-
-    if (top.length === 0){
+    if (scored.length === 0){
       logUnanswered(query);
       return { tag: null, text: "죄송해요, 등록된 자료에서 관련 내용을 찾지 못했어요. 이 질문은 관리자에게 전달되어 학습 자료 보강에 활용돼요. 표현을 조금 바꿔서 다시 질문해 보셔도 좋아요.", cite: null };
     }
 
-    const parts = top.map(x => trimText(x.c.text, 420));
-    const sourceDocTitles = [...new Set(top.map(x => x.c.docTitle))];
-    const sourceDocIds = [...new Set(top.map(x => x.c.docId))];
-    const answerText = parts.join("\n\n— — —\n\n");
+    const seen = new Set();
+    const chosen = [];
+    for (const x of scored){
+      if (chosen.length >= 3) break;
+      if (seen.has(x.s.text)) continue;
+      seen.add(x.s.text);
+      chosen.push(x.s);
+    }
+    chosen.sort((a,b)=> a.docId === b.docId ? a.idx - b.idx : 0);
+
+    const sourceDocTitles = [...new Set(chosen.map(c => c.docTitle))];
+    const sourceDocIds = [...new Set(chosen.map(c => c.docId))];
+    const answerText = composeAnswer(chosen.map(c => c.text));
 
     autoSaveLearnedAnswer(query, answerText, sourceDocIds, sourceDocTitles);
 
     return {
       tag: "자료 기반 답변",
       text: answerText,
-      cite: `참고 자료: ${sourceDocTitles.join(", ")} (자동 추출 결과이며, 정확한 해석은 원문을 확인하세요)`
+      cite: `참고 자료: ${sourceDocTitles.join(", ")} (자동 추출된 핵심 문장이며, 정확한 해석은 원문을 확인하세요)`
     };
   }
 
@@ -928,28 +1013,24 @@
     return row;
   }
 
-  function escapeHtml(s){
-    return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  }
-
   function renderGreeting(){
-    chatLog.innerHTML = "";
+    if (chatLog.children.length > 0) return;
     addMsg("bot", "안녕하세요! 저는 정심이에요 😊<br>업무와 관련하여 궁금한 사항을 질문해 주세요.");
-    if (getDocs().length === 0){
-      const el = document.createElement("div");
-      el.className = "empty-state";
-      el.textContent = "아직 등록된 자료가 없어요. 관리자 모드(⚙️)에서 법령·지침 자료를 등록하면 정심이가 답변할 수 있어요.";
-      chatLog.appendChild(el);
-    }
   }
 
+  function refreshNoDataBanner(){
+    const el = $("#noDataBanner");
+    if (!el) return;
+    el.classList.toggle("hidden", docsCache.length > 0);
+  }
+
+  /* FAQ chips are now a FIXED, admin-curated list — they no longer change
+     just because documents were added, edited, or removed */
   function renderFaqChips(){
     const wrap = $("#faqScroll");
-    const docs = getDocs();
-    let chips = [];
-    if (docs.length > 0){
-      chips = docs.slice(0,4).map(d => `${d.title}에 대해 알려주세요`);
-    } else {
+    if (!wrap) return;
+    let chips = getFaqList();
+    if (chips.length === 0){
       chips = ["보호처분의 종류와 기간을 알려주세요", "소년원 징계 종류는 무엇인가요?"];
     }
     wrap.innerHTML = "";
@@ -1009,7 +1090,7 @@
   $("#adminGateBtn").addEventListener("click", tryAdminAuth);
   $("#adminGatePw").addEventListener("keydown", e=>{ if(e.key==="Enter") tryAdminAuth(); });
   function tryAdminAuth(){
-    if ($("#adminGatePw").value === store.get("adminPw", null)){
+    if (appConfig && $("#adminGatePw").value === appConfig.admin_pw){
       adminGate.classList.add("hidden");
       adminAuthed.classList.remove("hidden");
       $("#drawerTitle").textContent = "관리자 모드";
@@ -1017,6 +1098,7 @@
       refreshDocList();
       refreshQnaList();
       refreshUnansweredList();
+      refreshFaqAdminList();
       $("#autoLearnToggle").checked = getAutoLearn();
     } else {
       toast("관리자 비밀번호가 올바르지 않아요.");
@@ -1035,7 +1117,7 @@
       btn.classList.add("active");
       $$("[data-panel]").forEach(p=> p.classList.add("hidden"));
       $(`[data-panel="${btn.dataset.tab}"]`).classList.remove("hidden");
-      if (btn.dataset.tab === "data") refreshDocList();
+      if (btn.dataset.tab === "data"){ refreshDocList(); refreshFaqAdminList(); }
       if (btn.dataset.tab === "learn"){
         refreshQnaList();
         refreshUnansweredList();
@@ -1045,22 +1127,63 @@
   });
 
   /* 접속/관리자 비밀번호 변경 */
-  $("#saveAccessPwBtn").addEventListener("click", ()=>{
+  $("#saveAccessPwBtn").addEventListener("click", async ()=>{
     const a = $("#newAccessPw").value.trim(), b = $("#newAccessPw2").value.trim();
     if (a.length < 4){ toast("4자리 이상 입력해주세요."); return; }
     if (a !== b){ toast("비밀번호가 서로 달라요."); return; }
-    store.set("accessPw", a);
-    $("#newAccessPw").value=""; $("#newAccessPw2").value="";
-    toast("접속 비밀번호가 변경됐어요.");
+    try{
+      await fsUpdateConfig({ access_pw: a });
+      $("#newAccessPw").value=""; $("#newAccessPw2").value="";
+      toast("접속 비밀번호가 변경됐어요. 모든 사용자에게 즉시 적용돼요.");
+    }catch(e){ toast("저장 중 오류가 발생했어요."); }
   });
-  $("#saveAdminPwBtn").addEventListener("click", ()=>{
+  $("#saveAdminPwBtn").addEventListener("click", async ()=>{
     const a = $("#newAdminPw").value.trim(), b = $("#newAdminPw2").value.trim();
     if (a.length < 4){ toast("4자리 이상 입력해주세요."); return; }
     if (a !== b){ toast("비밀번호가 서로 달라요."); return; }
-    store.set("adminPw", a);
-    $("#newAdminPw").value=""; $("#newAdminPw2").value="";
-    toast("관리자 비밀번호가 변경됐어요.");
+    try{
+      await fsUpdateConfig({ admin_pw: a });
+      $("#newAdminPw").value=""; $("#newAdminPw2").value="";
+      toast("관리자 비밀번호가 변경됐어요.");
+    }catch(e){ toast("저장 중 오류가 발생했어요."); }
   });
+
+  /* ---- FAQ (fixed) admin management ---- */
+  $("#faqAddBtn").addEventListener("click", async ()=>{
+    const v = $("#faqAddInput").value.trim();
+    if (!v){ toast("질문을 입력해주세요."); return; }
+    const list = getFaqList().slice();
+    if (list.length >= 8){ toast("최대 8개까지 등록할 수 있어요."); return; }
+    if (list.includes(v)){ toast("이미 등록된 질문이에요."); return; }
+    list.push(v);
+    try{
+      await fsUpdateConfig({ faq_list: list });
+      $("#faqAddInput").value = "";
+      toast("자주 찾는 질문에 추가됐어요.");
+    }catch(e){ toast("저장 중 오류가 발생했어요."); }
+  });
+
+  function refreshFaqAdminList(){
+    const wrap = $("#faqAdminList");
+    if (!wrap) return;
+    const list = getFaqList();
+    wrap.innerHTML = "";
+    if (list.length === 0){
+      wrap.innerHTML = `<div class="empty-mini">고정된 질문이 없어요. 기본 예시 질문 2개가 대신 표시돼요.</div>`;
+      return;
+    }
+    list.forEach((q, idx)=>{
+      const row = document.createElement("div");
+      row.className = "faq-admin-item";
+      row.innerHTML = `<span>${escapeHtml(q)}</span><button title="삭제">✕</button>`;
+      row.querySelector("button").addEventListener("click", async ()=>{
+        const next = getFaqList().filter((_, i)=> i !== idx);
+        try{ await fsUpdateConfig({ faq_list: next }); toast("삭제됐어요."); }
+        catch(e){ toast("저장 중 오류가 발생했어요."); }
+      });
+      wrap.appendChild(row);
+    });
+  }
 
   /* ---- data tab: file upload ---- */
   const uploadZone = $("#uploadZone");
@@ -1104,7 +1227,6 @@
     const files = Array.from(fileList||[]);
     if (files.length === 0) return;
     toast(`${files.length}개 파일을 처리 중이에요...`);
-    const docs = getDocs();
     for (const f of files){
       try{
         let text = "";
@@ -1116,40 +1238,37 @@
         }
         text = text.trim();
         if (!text){ toast(`${f.name}: 추출된 텍스트가 없어요.`); continue; }
-        const newDoc = { id: uid(), title: f.name.replace(/\.(txt|md|pdf)$/i,""), content: text, chars: text.length, addedAt: Date.now() };
-        docs.push(newDoc);
-        autoLearnFromDoc(newDoc);
-        refreshQnaListIfOpen();
+        const id = uid();
+        const newDoc = { id, title: f.name.replace(/\.(txt|md|pdf)$/i,""), content: text, chars: text.length, added_at: Date.now() };
+        await sbUpsert("docs", newDoc);
+        await autoLearnFromDoc(newDoc);
       }catch(err){
         toast(`${f.name} 처리 중 오류가 발생했어요. (PDF 로딩은 인터넷 연결이 필요해요)`);
       }
     }
-    setDocs(docs);
-    refreshDocList();
-    refreshFaqIfChanged();
     fileInput.value = "";
-    toast("자료 등록이 완료됐어요.");
+    toast("자료 등록이 완료됐어요. 모든 사용자에게 바로 반영돼요.");
   }
 
-  $("#pasteAddBtn").addEventListener("click", ()=>{
+  $("#pasteAddBtn").addEventListener("click", async ()=>{
     const title = $("#pasteTitle").value.trim();
     const content = $("#pasteContent").value.trim();
     if (!title){ toast("자료 제목을 입력해주세요."); return; }
     if (!content){ toast("내용을 입력해주세요."); return; }
-    const docs = getDocs();
-    const newDoc = { id: uid(), title, content, chars: content.length, addedAt: Date.now() };
-    docs.push(newDoc);
-    setDocs(docs);
-    autoLearnFromDoc(newDoc);
-    refreshQnaListIfOpen();
-    $("#pasteTitle").value=""; $("#pasteContent").value="";
-    refreshDocList();
-    refreshFaqIfChanged();
-    toast("텍스트 자료가 등록됐어요.");
+    const btn = $("#pasteAddBtn"); btn.disabled = true;
+    try{
+      const id = uid();
+      const newDoc = { id, title, content, chars: content.length, added_at: Date.now() };
+      await sbUpsert("docs", newDoc);
+      await autoLearnFromDoc(newDoc);
+      $("#pasteTitle").value=""; $("#pasteContent").value="";
+      toast("텍스트 자료가 등록됐어요. 모든 사용자에게 바로 반영돼요.");
+    }catch(e){ toast("저장 중 오류가 발생했어요."); }
+    finally{ btn.disabled = false; }
   });
 
   function refreshDocList(){
-    const docs = getDocs().slice().sort((a,b)=> b.addedAt - a.addedAt);
+    const docs = docsCache;
     $("#docCountBadge").textContent = docs.length + "개";
     const wrap = $("#docList");
     wrap.innerHTML = "";
@@ -1164,28 +1283,25 @@
         <div class="doc-icon">📄</div>
         <div class="doc-meta">
           <div class="doc-title">${escapeHtml(d.title)}</div>
-          <div class="doc-sub">${(d.chars||0).toLocaleString()}자 · ${fmtDate(d.addedAt)}</div>
+          <div class="doc-sub">${(d.chars||0).toLocaleString()}자 · ${fmtDate(d.added_at)}</div>
         </div>
         <button class="doc-trash" title="삭제">🗑</button>
       `;
-      card.querySelector(".doc-trash").addEventListener("click", ()=>{
+      card.querySelector(".doc-trash").addEventListener("click", async ()=>{
         if (!confirm(`"${d.title}" 자료를 삭제할까요?`)) return;
-        setDocs(getDocs().filter(x=> x.id !== d.id));
-        pruneAutoLearnedForDoc(d.id);
-        refreshDocList();
-        refreshFaqIfChanged();
-        refreshQnaListIfOpen();
-        toast("삭제됐어요.");
+        try{
+          await pruneAutoLearnedForDoc(d.id);
+          await sbDelete("docs", d.id);
+          toast("삭제됐어요.");
+        }catch(e){ toast("삭제 중 오류가 발생했어요."); }
       });
       wrap.appendChild(card);
     });
   }
 
-  function refreshFaqIfChanged(){ if (!chatScreen.classList.contains("hidden")) renderFaqChips(); }
-
   /* ---- learn tab ---- */
   function refreshUnansweredList(){
-    const list = getUnanswered();
+    const list = unansweredCache;
     const wrap = $("#unansweredList");
     wrap.innerHTML = "";
     if (list.length === 0){
@@ -1197,51 +1313,49 @@
       card.className = "qa-log-card";
       card.innerHTML = `
         <div class="qa-log-q">${escapeHtml(item.question)}</div>
-        <div class="qa-log-time">${fmtDate(item.askedAt)} · ${item.count||1}회 질문됨</div>
+        <div class="qa-log-time">${fmtDate(item.asked_at)} · ${item.count||1}회 질문됨</div>
         <textarea class="input" placeholder="이 질문에 대한 답변을 입력하세요"></textarea>
         <div class="qa-log-actions">
           <button class="btn btn-danger" data-act="dismiss">삭제</button>
           <button class="btn btn-ghost btn-sm" data-act="save">답변 저장</button>
         </div>
       `;
-      card.querySelector('[data-act="dismiss"]').addEventListener("click", ()=>{
-        setUnanswered(getUnanswered().filter(x=> x.id !== item.id));
-        refreshUnansweredList();
+      card.querySelector('[data-act="dismiss"]').addEventListener("click", async ()=>{
+        try{ await sbDelete("unanswered", item.id); }catch(e){ toast("삭제 중 오류가 발생했어요."); }
       });
-      card.querySelector('[data-act="save"]').addEventListener("click", ()=>{
+      card.querySelector('[data-act="save"]').addEventListener("click", async ()=>{
         const ans = card.querySelector("textarea").value.trim();
         if (!ans){ toast("답변을 입력해주세요."); return; }
-        const qna = getQna();
-        qna.unshift({ id: uid(), question: item.question, answer: ans, addedAt: Date.now() });
-        setQna(qna);
-        setUnanswered(getUnanswered().filter(x=> x.id !== item.id));
-        refreshUnansweredList();
-        refreshQnaList();
-        toast("학습 데이터로 저장했어요. 다음부터 정확히 답할 수 있어요!");
+        try{
+          await sbUpsert("qna", { id: uid(), question: item.question, answer: ans, added_at: Date.now(), auto: false });
+          await sbDelete("unanswered", item.id);
+          toast("학습 데이터로 저장했어요. 다음부터 정확히 답할 수 있어요!");
+        }catch(e){ toast("저장 중 오류가 발생했어요."); }
       });
       wrap.appendChild(card);
     });
   }
 
-  $("#autoLearnToggle").addEventListener("change", (e)=>{
-    setAutoLearn(e.target.checked);
-    toast(e.target.checked ? "자동학습을 켰어요." : "자동학습을 껐어요.");
+  $("#autoLearnToggle").addEventListener("change", async (e)=>{
+    try{
+      await fsUpdateConfig({ auto_learn: e.target.checked });
+      toast(e.target.checked ? "자동학습을 켰어요." : "자동학습을 껐어요.");
+    }catch(err){ toast("저장 중 오류가 발생했어요."); }
   });
 
-  $("#manualAddBtn").addEventListener("click", ()=>{
+  $("#manualAddBtn").addEventListener("click", async ()=>{
     const q = $("#manualQ").value.trim();
     const a = $("#manualA").value.trim();
     if (!q || !a){ toast("질문과 답변을 모두 입력해주세요."); return; }
-    const qna = getQna();
-    qna.unshift({ id: uid(), question: q, answer: a, addedAt: Date.now() });
-    setQna(qna);
-    $("#manualQ").value=""; $("#manualA").value="";
-    refreshQnaList();
-    toast("학습 데이터가 추가됐어요.");
+    try{
+      await sbUpsert("qna", { id: uid(), question: q, answer: a, added_at: Date.now(), auto: false });
+      $("#manualQ").value=""; $("#manualA").value="";
+      toast("학습 데이터가 추가됐어요.");
+    }catch(e){ toast("저장 중 오류가 발생했어요."); }
   });
 
   function refreshQnaList(){
-    const list = getQna();
+    const list = qnaCache;
     $("#qnaCountBadge").textContent = list.length + "개";
     const wrap = $("#qnaList");
     wrap.innerHTML = "";
@@ -1255,8 +1369,8 @@
       const badge = item.auto
         ? `<span class="badge auto-badge">🤖 자동학습</span>`
         : `<span class="badge manual-badge">🧑‍💼 관리자 등록</span>`;
-      const srcLine = (item.sourceDocTitles && item.sourceDocTitles.length)
-        ? `<div class="qna-src">출처: ${escapeHtml(item.sourceDocTitles.join(", "))}</div>`
+      const srcLine = (item.source_doc_titles && item.source_doc_titles.length)
+        ? `<div class="qna-src">출처: ${escapeHtml(item.source_doc_titles.join(", "))}</div>`
         : "";
       card.innerHTML = `
         <div class="qna-top">${badge}</div>
@@ -1265,13 +1379,88 @@
         ${srcLine}
         <div class="qna-foot"><button class="btn btn-danger">삭제</button></div>
       `;
-      card.querySelector("button").addEventListener("click", ()=>{
-        setQna(getQna().filter(x=> x.id !== item.id));
-        refreshQnaList();
-        toast("삭제됐어요.");
+      card.querySelector("button").addEventListener("click", async ()=>{
+        try{ await sbDelete("qna", item.id); toast("삭제됐어요."); }
+        catch(e){ toast("삭제 중 오류가 발생했어요."); }
       });
       wrap.appendChild(card);
     });
+  }
+
+  function refreshQnaListIfOpen(){
+    const panel = document.querySelector('[data-panel="learn"]');
+    if (panel && !panel.classList.contains("hidden")) refreshQnaList();
+  }
+  function refreshUnansweredListIfOpen(){
+    const panel = document.querySelector('[data-panel="learn"]');
+    if (panel && !panel.classList.contains("hidden")) refreshUnansweredList();
+  }
+  function refreshDocListIfOpen(){
+    const panel = document.querySelector('[data-panel="data"]');
+    if (panel && !panel.classList.contains("hidden")) refreshDocList();
+  }
+  function refreshFaqAdminListIfOpen(){
+    const panel = document.querySelector('[data-panel="data"]');
+    if (panel && !panel.classList.contains("hidden")) refreshFaqAdminList();
+  }
+
+  /* ================= SUPABASE REAL-TIME SYNC ================= */
+  async function refreshDocsCache(){
+    try{
+      const { data, error } = await sb.from("docs").select("*");
+      if (error) throw error;
+      docsCache = (data||[]).sort((a,b)=> (b.added_at||0)-(a.added_at||0));
+      refreshDocListIfOpen();
+      refreshNoDataBanner();
+    }catch(e){ console.error("docs sync error", e); }
+  }
+  async function refreshQnaCache(){
+    try{
+      const { data, error } = await sb.from("qna").select("*");
+      if (error) throw error;
+      qnaCache = (data||[]).sort((a,b)=> (b.added_at||0)-(a.added_at||0));
+      refreshQnaListIfOpen();
+    }catch(e){ console.error("qna sync error", e); }
+  }
+  async function refreshUnansweredCache(){
+    try{
+      const { data, error } = await sb.from("unanswered").select("*");
+      if (error) throw error;
+      unansweredCache = (data||[]).sort((a,b)=> (b.asked_at||0)-(a.asked_at||0));
+      refreshUnansweredListIfOpen();
+    }catch(e){ console.error("unanswered sync error", e); }
+  }
+  async function refreshConfigCache(){
+    const wasLoaded = configLoaded;
+    try{
+      const { data, error } = await sb.from("config").select("*").eq("id","app").maybeSingle();
+      if (error) throw error;
+      appConfig = data || null;
+    }catch(e){
+      console.error("config sync error", e);
+      appConfig = null;
+    }
+    configLoaded = true;
+    if (!wasLoaded){
+      showLock();
+    } else if (!lockScreen.classList.contains("hidden")){
+      showLock();
+    }
+    if (!chatScreen.classList.contains("hidden")) renderFaqChips();
+    refreshFaqAdminListIfOpen();
+  }
+
+  async function startSync(){
+    showScreen("loading");
+    try{
+      await Promise.all([refreshDocsCache(), refreshQnaCache(), refreshUnansweredCache(), refreshConfigCache()]);
+    }catch(e){
+      toast("데이터베이스 연결에 실패했어요. Supabase 설정을 확인해주세요.");
+    }
+    sb.channel("docs-changes").on("postgres_changes", { event:"*", schema:"public", table:"docs" }, refreshDocsCache).subscribe();
+    sb.channel("qna-changes").on("postgres_changes", { event:"*", schema:"public", table:"qna" }, refreshQnaCache).subscribe();
+    sb.channel("unanswered-changes").on("postgres_changes", { event:"*", schema:"public", table:"unanswered" }, refreshUnansweredCache).subscribe();
+    sb.channel("config-changes").on("postgres_changes", { event:"*", schema:"public", table:"config" }, refreshConfigCache).subscribe();
   }
 
   /* ================= PWA service worker ================= */
@@ -1286,7 +1475,7 @@
   updateClock();
   setInterval(updateClock, 15000);
   loadWeather();
-  showLock();
+  startSync();
 })();
 </script>
 </body>
